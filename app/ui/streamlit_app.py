@@ -45,7 +45,7 @@ from app.ingest import get_business, list_businesses  # noqa: E402
 from app.sources import address_crosscheck  # noqa: E402
 from app.ui import call_animation, freshness_view, search_animation  # noqa: E402
 from app.ui.history_view import render_history  # noqa: E402
-from app.ui import ai_search_chat, data_sources_view  # noqa: E402
+from app.ui import ai_search_chat, data_sources_view, theme  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
@@ -128,6 +128,11 @@ TRANSLATIONS = {
         "map_caption_legend": (
             "Rood = hoge prioriteit, oranje = gemiddelde prioriteit, groen = lage prioriteit, "
             "grijs = nog niet gecontroleerd."
+        ),
+        "map_legend_panel_title": "Legenda",
+        "map_coverage_panel_title": "Overzicht",
+        "map_coverage_caption": (
+            "Deze aantallen worden bij elke vernieuwing van het dashboard opnieuw berekend."
         ),
         "demo_caption": "Snel gevulde voorbeeldgegevens laden:",
         "demo_button": "Voorbeeldgegevens laden",
@@ -281,6 +286,11 @@ TRANSLATIONS = {
         "map_caption_legend": (
             "Red = high priority, orange = medium priority, green = low priority, "
             "grey = not yet checked."
+        ),
+        "map_legend_panel_title": "Legend",
+        "map_coverage_panel_title": "Overview",
+        "map_coverage_caption": (
+            "These counts are recalculated every time the dashboard refreshes."
         ),
         "demo_caption": "Quickly load a populated set of sample data:",
         "demo_button": "Load sample data",
@@ -663,11 +673,17 @@ def get_stats(db_path: str) -> dict:
 
 def render_stats_header(db_path: str, lang: str) -> None:
     stats = get_stats(db_path)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric(t("stat_total", lang), stats["total"])
-    c2.metric(t("stat_checked", lang), stats["checked"])
-    c3.metric(t("stat_high_priority", lang), stats["high_priority"])
-    c4.metric(t("stat_confirmed", lang), stats["confirmed"])
+    row_html = theme.stat_row_html(
+        [
+            theme.stat_block_html(t("stat_total", lang), str(stats["total"])),
+            theme.stat_block_html(t("stat_checked", lang), str(stats["checked"])),
+            theme.stat_block_html(
+                t("stat_high_priority", lang), str(stats["high_priority"]), accent=True
+            ),
+            theme.stat_block_html(t("stat_confirmed", lang), str(stats["confirmed"])),
+        ]
+    )
+    st.markdown(row_html, unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------------------
@@ -800,6 +816,58 @@ def build_map_dataframe(rows: list, lang: str) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def _map_legend_panel_html(lang: str) -> str:
+    """HTML for the map's aside "Legend" panel: one color swatch + label per
+    priority category, reusing MAP_CATEGORY_COLORS/map_legend_labels as-is.
+    """
+    labels = map_legend_labels(lang)
+    rows_html = "".join(
+        '<div style="display:flex;align-items:center;gap:9px;">'
+        f'<span style="width:9px;height:9px;background:{MAP_CATEGORY_COLORS[category]};'
+        'flex:none;display:inline-block;"></span>'
+        f"{html.escape(labels[category])}</div>"
+        for category in ("unchecked", "low", "medium", "high")
+    )
+    return (
+        f'<div style="border:1px solid {theme.COLOR_NEUTRAL_300};background:#ffffff;'
+        'margin-bottom:16px;">'
+        f'{theme.panel_header(t("map_legend_panel_title", lang))}'
+        '<div style="display:flex;flex-direction:column;gap:9px;font-size:13px;'
+        f'padding:12px 14px;">{rows_html}</div></div>'
+    )
+
+
+def _map_coverage_panel_html(db_path: str, lang: str) -> str:
+    """HTML for the map's aside coverage panel: a few already-computed
+    get_stats() counts as key/value rows, plus a short explanatory caption.
+    """
+    stats = get_stats(db_path)
+    kv_rows = [
+        (t("stat_total", lang), stats["total"]),
+        (t("stat_checked", lang), stats["checked"]),
+        (t("stat_confirmed", lang), stats["confirmed"]),
+    ]
+    last = len(kv_rows) - 1
+    rows_html = "".join(
+        '<div style="display:flex;justify-content:space-between;gap:14px;padding:8px 14px;'
+        + ("border-bottom:0;" if i == last else f"border-bottom:1px solid {theme.COLOR_NEUTRAL_200};")
+        + 'font-size:13px;">'
+        f'<span style="color:{theme.COLOR_NEUTRAL_700};">{html.escape(label)}</span>'
+        f"<b>{html.escape(str(value))}</b></div>"
+        for i, (label, value) in enumerate(kv_rows)
+    )
+    caption_html = (
+        '<p style="font-size:12.5px;margin:0;padding:12px 14px;'
+        f'border-top:1px solid {theme.COLOR_NEUTRAL_200};color:{theme.COLOR_NEUTRAL_700};">'
+        f'{html.escape(t("map_coverage_caption", lang))}</p>'
+    )
+    return (
+        f'<div style="border:1px solid {theme.COLOR_NEUTRAL_300};background:#ffffff;">'
+        f'{theme.panel_header(t("map_coverage_panel_title", lang))}'
+        f"{rows_html}{caption_html}</div>"
+    )
+
+
 def render_map(db_path: str, lang: str) -> None:
     st.subheader(t("map_header", lang))
     rows = load_map_rows(db_path)
@@ -808,27 +876,34 @@ def render_map(db_path: str, lang: str) -> None:
         return
 
     df = build_map_dataframe(rows, lang)
-    try:
-        import pydeck as pdk
+    map_col, aside_col = st.columns([3, 1])
+    with map_col:
+        try:
+            import pydeck as pdk
 
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=df,
-            get_position="[lon, lat]",
-            get_fill_color="color",
-            get_radius=35,
-            pickable=True,
-        )
-        view_state = pdk.ViewState(
-            latitude=float(df["lat"].mean()),
-            longitude=float(df["lon"].mean()),
-            zoom=13,
-        )
-        tooltip = {"text": "{naam}\n{prioriteit_label}"}
-        st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip))
-    except Exception:  # noqa: BLE001 -- map must degrade, never crash the dashboard
-        st.map(df[["lat", "lon"]])
-    st.caption(t("map_caption_legend", lang))
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=df,
+                get_position="[lon, lat]",
+                get_fill_color="color",
+                get_radius=35,
+                pickable=True,
+            )
+            view_state = pdk.ViewState(
+                latitude=float(df["lat"].mean()),
+                longitude=float(df["lon"].mean()),
+                zoom=13,
+            )
+            tooltip = {"text": "{naam}\n{prioriteit_label}"}
+            st.pydeck_chart(
+                pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip)
+            )
+        except Exception:  # noqa: BLE001 -- map must degrade, never crash the dashboard
+            st.map(df[["lat", "lon"]])
+        st.caption(t("map_caption_legend", lang))
+    with aside_col:
+        st.markdown(_map_legend_panel_html(lang), unsafe_allow_html=True)
+        st.markdown(_map_coverage_panel_html(db_path, lang), unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------------------
@@ -1711,6 +1786,7 @@ def main() -> None:
     # so this defaults to Dutch, per the compliance requirement.
     lang = st.session_state.get("lang", "nl")
     st.set_page_config(page_title=t("page_title", lang), layout="wide")
+    theme.inject()
 
     # Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav)
     # so only this app's own custom sidebar navigation below is visible --
