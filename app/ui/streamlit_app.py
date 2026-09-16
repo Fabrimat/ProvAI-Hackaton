@@ -39,13 +39,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from app import scoring, seasonal  # noqa: E402
+from app import db, description, scoring, seasonal  # noqa: E402
 from app.db import get_connection  # noqa: E402
 from app.ingest import get_business, list_businesses  # noqa: E402
-from app.ui import call_animation, freshness_view  # noqa: E402
+from app.sources import address_crosscheck  # noqa: E402
+from app.ui import call_animation, freshness_view, search_animation  # noqa: E402
 from app.ui.history_view import render_history  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
+
+# Startup migration safety net: local/non-Docker runs of this app must also
+# get the schema migration and evidence-dedupe cleanup that the Docker
+# container's own entrypoint already performs. Cheap and idempotent, so
+# running these on every script execution/rerun is acceptable overhead.
+db.init_db(DB_PATH)
+description.backfill_missing_descriptions(DB_PATH)
+scoring.dedupe_evidence(DB_PATH)
 
 # Primary screens (Dashboard = monitoring, Te verifiëren = acting) come
 # first, per the product owner's split between "automatic-system monitoring"
@@ -119,10 +128,10 @@ TRANSLATIONS = {
             "Rood = hoge prioriteit, oranje = gemiddelde prioriteit, groen = lage prioriteit, "
             "grijs = nog niet gecontroleerd."
         ),
-        "demo_caption": "Snel een gevulde demo-omgeving tonen:",
-        "demo_button": "Laad demo-scenario",
-        "demo_spinner": "Demo-scenario wordt geladen...",
-        "demo_success": "Demo-scenario geladen: {n} bedrijven gecontroleerd.",
+        "demo_caption": "Snel gevulde voorbeeldgegevens laden:",
+        "demo_button": "Voorbeeldgegevens laden",
+        "demo_spinner": "Voorbeeldgegevens worden geladen...",
+        "demo_success": "Voorbeeldgegevens geladen: {n} bedrijven gecontroleerd.",
         "casefile_no_verification": (
             "Nog geen verificatie uitgevoerd voor {name}. "
             "Klik op 'Voer verificatie uit' om de bronnen te raadplegen."
@@ -166,10 +175,9 @@ TRANSLATIONS = {
         "triage_open_dossier_button": "Open dossier",
         "triage_verify_header": "Verificatie uitvoeren",
         "triage_verify_caption": (
-            "Om de demo snel te houden wordt verificatie niet automatisch voor alle "
-            "{n} nog te controleren bedrijven uitgevoerd. Kies hieronder hoeveel "
-            "bedrijven nu geverifieerd worden, of open een dossier hierboven om één bedrijf "
-            "tegelijk te verifiëren."
+            "Verificatie wordt niet automatisch uitgevoerd voor alle {n} nog te "
+            "controleren bedrijven. Kies hieronder hoeveel bedrijven nu geverifieerd "
+            "worden, of open een dossier hierboven om één bedrijf tegelijk te verifiëren."
         ),
         "triage_batch_size_label": "Aantal te verifiëren bedrijven",
         "triage_run_verification_button": "Verificatie uitvoeren",
@@ -188,13 +196,26 @@ TRANSLATIONS = {
         "dossier_last_updated_caption": "Laatst bijgewerkt: {date}",
         "dossier_verification_header": "Verificatie",
         "dossier_run_verification_button": "Voer verificatie uit",
-        "dossier_verification_spinner": "Bronnen worden geraadpleegd...",
         "dossier_verification_success": "Verificatie voltooid.",
         "dossier_call_simulation_button": "Simuleer telefoongesprek",
         "dossier_call_simulation_success": "Gesprek afgerond en gelogd als bewijs.",
         "dossier_case_file_header": "Case-dossier",
         "dossier_internal_debug_caption": "(interne detail, EN: {reason})",
-        "dossier_score_header": "Prioriteitsscore",
+        "dossier_reliability_header": "Betrouwbaarheid",
+        "reliability_status_active": "Actief",
+        "reliability_status_inactive": "Inactief",
+        "reliability_status_unknown": "Onbekend",
+        "reliability_trust_trusted": "Betrouwbaar",
+        "reliability_trust_needs_verification": "Verificatie aanbevolen",
+        "reliability_freshness_fresh": "Actueel",
+        "reliability_freshness_aging": "Verouderend",
+        "reliability_freshness_stale": "Verouderd",
+        "dossier_address_conflict_label": "Adresconflict",
+        "dossier_open_related_dossier_button": "Open dossier van dit bedrijf",
+        "dossier_sources_overview_header": "Bronnen in één oogopslag",
+        "source_not_yet_checked": "Nog niet gecontroleerd",
+        "dossier_technical_details_header": "Technische details",
+        "col_reliability": "Betrouwbaarheid",
         "dossier_metric_uncertainty": "Onzekerheid",
         "dossier_metric_impact": "Impact",
         "dossier_metric_priority_total": "Prioriteit (totaal)",
@@ -261,10 +282,10 @@ TRANSLATIONS = {
             "Red = high priority, orange = medium priority, green = low priority, "
             "grey = not yet checked."
         ),
-        "demo_caption": "Quickly show a populated demo environment:",
-        "demo_button": "Load demo scenario",
-        "demo_spinner": "Loading demo scenario...",
-        "demo_success": "Demo scenario loaded: {n} businesses checked.",
+        "demo_caption": "Quickly load a populated set of sample data:",
+        "demo_button": "Load sample data",
+        "demo_spinner": "Loading sample data...",
+        "demo_success": "Sample data loaded: {n} businesses checked.",
         "casefile_no_verification": (
             "No verification has been carried out yet for {name}. "
             "Click 'Run verification' to consult the sources."
@@ -307,9 +328,9 @@ TRANSLATIONS = {
         "triage_open_dossier_button": "Open case file",
         "triage_verify_header": "Run verification",
         "triage_verify_caption": (
-            "To keep the demo fast, verification is not automatically run for all "
-            "{n} businesses still to be checked. Choose below how many businesses to "
-            "verify now, or open a case file above to verify one business at a time."
+            "Verification is not automatically run for all {n} businesses still to be "
+            "checked. Choose below how many businesses to verify now, or open a case "
+            "file above to verify one business at a time."
         ),
         "triage_batch_size_label": "Number of businesses to verify",
         "triage_run_verification_button": "Run verification",
@@ -328,13 +349,26 @@ TRANSLATIONS = {
         "dossier_last_updated_caption": "Last updated: {date}",
         "dossier_verification_header": "Verification",
         "dossier_run_verification_button": "Run verification",
-        "dossier_verification_spinner": "Consulting sources...",
         "dossier_verification_success": "Verification completed.",
         "dossier_call_simulation_button": "Simulate phone call",
         "dossier_call_simulation_success": "Call completed and logged as evidence.",
         "dossier_case_file_header": "Case file",
         "dossier_internal_debug_caption": "(internal detail, EN: {reason})",
-        "dossier_score_header": "Priority score",
+        "dossier_reliability_header": "Reliability",
+        "reliability_status_active": "Active",
+        "reliability_status_inactive": "Inactive",
+        "reliability_status_unknown": "Unknown",
+        "reliability_trust_trusted": "Reliable",
+        "reliability_trust_needs_verification": "Verification recommended",
+        "reliability_freshness_fresh": "Up to date",
+        "reliability_freshness_aging": "Aging",
+        "reliability_freshness_stale": "Outdated",
+        "dossier_address_conflict_label": "Address conflict",
+        "dossier_open_related_dossier_button": "Open this business's dossier",
+        "dossier_sources_overview_header": "Sources at a glance",
+        "source_not_yet_checked": "Not yet checked",
+        "dossier_technical_details_header": "Technical details",
+        "col_reliability": "Reliability",
         "dossier_metric_uncertainty": "Uncertainty",
         "dossier_metric_impact": "Impact",
         "dossier_metric_priority_total": "Priority (total)",
@@ -704,6 +738,46 @@ MAP_CATEGORY_COLORS = {
     "high": MAP_COLOR_HIGH,
 }
 
+# Evidence signal -> badge color, shared by the dossier's reliability badges,
+# the "sources at a glance" overview and the worklist's per-row color-coding
+# below. Reuses the exact same hex palette as MAP_CATEGORY_COLORS above so
+# every color-coded surface in this app reads consistently.
+SIGNAL_BADGE_COLORS = {
+    "active": MAP_COLOR_LOW,
+    "inactive": MAP_COLOR_HIGH,
+    "disagreement": MAP_COLOR_MEDIUM,
+    "silent": MAP_COLOR_UNCHECKED,
+}
+
+# Human-readable names for every evidence source (keyed by each
+# app.sources.*.SOURCE_NAME), used by the dossier's "sources at a glance"
+# overview.
+SOURCE_DISPLAY_NAMES = {
+    "google_maps": {"nl": "Google Maps", "en": "Google Maps"},
+    "trustpilot": {"nl": "Trustpilot", "en": "Trustpilot"},
+    "infobel": {"nl": "Bedrijvengids (Infobel)", "en": "Business directory (Infobel)"},
+    "osm": {"nl": "OpenStreetMap", "en": "OpenStreetMap"},
+    "voice_agent": {"nl": "Telefooncontrole", "en": "Phone call check"},
+    "email": {"nl": "E-mailcontrole", "en": "E-mail check"},
+    "internal_mailbox": {"nl": "Interne postbus", "en": "Internal mailbox"},
+    "neighbor_check": {"nl": "Burencontrole", "en": "Neighbor check"},
+    "address_crosscheck": {"nl": "Adrescontrole", "en": "Address cross-check"},
+}
+
+# Display order for the sources-overview grid, matching
+# scoring.run_all_sources's own run order (Google Maps ... address cross-check).
+SOURCE_DISPLAY_ORDER = [
+    "google_maps",
+    "trustpilot",
+    "infobel",
+    "osm",
+    "voice_agent",
+    "email",
+    "internal_mailbox",
+    "neighbor_check",
+    "address_crosscheck",
+]
+
 
 def build_map_dataframe(rows: list, lang: str) -> pd.DataFrame:
     """Turn ``load_map_rows`` output into a DataFrame ready for st.map/pydeck."""
@@ -762,7 +836,7 @@ def render_map(db_path: str, lang: str) -> None:
 # One-click demo scenario (curated set of real businesses).
 # --------------------------------------------------------------------------
 
-def run_demo_scenario(db_path: str, on_progress=None) -> int:
+def run_demo_scenario(db_path: str, on_progress=None, include_mailbox: bool = True) -> int:
     """Run the scoring pipeline for CURATED_DEMO_UIDNS.
 
     Safe to call repeatedly: run_all_sources/compute_score already
@@ -771,14 +845,15 @@ def run_demo_scenario(db_path: str, on_progress=None) -> int:
     businesses actually found and processed. ``on_progress``, if given,
     is called with a float in [0, 1] after each business (matching the
     ``st.progress(...)`` calling convention already used elsewhere in
-    this file).
+    this file). ``include_mailbox`` is threaded straight through to
+    ``scoring.run_all_sources``.
     """
     total = len(CURATED_DEMO_UIDNS)
     processed = 0
     for i, uidn in enumerate(CURATED_DEMO_UIDNS):
         business = get_business(uidn, db_path)
         if business:
-            scoring.run_all_sources(business, db_path)
+            scoring.run_all_sources(business, db_path, include_mailbox=include_mailbox)
             scoring.compute_score(uidn, db_path)
             processed += 1
         if on_progress:
@@ -790,10 +865,11 @@ def render_demo_scenario_control(db_path: str, lang: str) -> None:
     st.sidebar.divider()
     st.sidebar.caption(t("demo_caption", lang))
     if st.sidebar.button(t("demo_button", lang)):
+        include_mailbox = st.session_state.get("mailbox_source_enabled", False)
         with st.sidebar:
             with st.spinner(t("demo_spinner", lang)):
                 progress = st.progress(0.0)
-                processed = run_demo_scenario(db_path, progress.progress)
+                processed = run_demo_scenario(db_path, progress.progress, include_mailbox=include_mailbox)
         st.cache_data.clear()
         # Flash pattern, see render_flash(): a success message right before
         # st.rerun() would only be visible for a fraction of a second (if at
@@ -833,12 +909,12 @@ def render_flash() -> None:
 
 
 # --------------------------------------------------------------------------
-# Demo walkthrough: a scripted sequence of navigation-only stops for the
-# video recording. Steps only change nav/selected_uidn session_state (the
+# Guided tour: a scripted sequence of navigation-only stops for a presenter
+# to walk through. Steps only change nav/selected_uidn session_state (the
 # same pending_nav mechanism used elsewhere in this file); they never trigger
 # an in-view action themselves, so the presenter still visibly clicks the
 # real buttons on camera. Assumes CURATED_DEMO_UIDNS was already seeded via
-# the "Laad demo-scenario" button before recording started.
+# the "Voorbeeldgegevens laden" button before recording started.
 # --------------------------------------------------------------------------
 
 DEMO_WALKTHROUGH_STEPS = [
@@ -861,8 +937,8 @@ DEMO_WALKTHROUGH_STEPS = [
     {
         "nav": "Dossier",
         "uidn": CURATED_DEMO_UIDNS[0],
-        "caption_nl": "klik op 'Simuleer telefoongesprek' om de AI-spraakcontrole te tonen.",
-        "caption_en": "click 'Simulate phone call' to show the AI voice check.",
+        "caption_nl": "klik op de belknop om de AI-spraakcontrole te tonen.",
+        "caption_en": "click the call button to show the AI voice check.",
     },
     {
         "nav": "Dossier",
@@ -887,15 +963,15 @@ def render_demo_walkthrough_control(lang: str) -> None:
     run before recording starts, see render_demo_scenario_control above).
     """
     total = len(DEMO_WALKTHROUGH_STEPS)
-    expander_title = "Demo doorloop" if lang == "nl" else "Demo walkthrough"
+    expander_title = "Snelle rondleiding" if lang == "nl" else "Guided tour"
     with st.sidebar.expander(expander_title):
         step = st.session_state.get("demo_step", 0)
         if step > 0:
             current = DEMO_WALKTHROUGH_STEPS[step - 1]
             if lang == "nl":
-                st.caption(f"Demo stap {step} van {total}: {current['caption_nl']}")
+                st.caption(f"Stap {step} van {total}: {current['caption_nl']}")
             else:
-                st.caption(f"Demo step {step} of {total}: {current['caption_en']}")
+                st.caption(f"Step {step} of {total}: {current['caption_en']}")
         else:
             st.caption(
                 "Nog niet gestart." if lang == "nl" else "Not started yet."
@@ -1013,6 +1089,7 @@ def view_to_verify(db_path: str, lang: str) -> None:
                 or r.get("omschrijving_hoofdact_btw")
                 or "",
                 "prioriteit": r.get("priority_score"),
+                "onzekerheid": r.get("uncertainty_score"),
                 "status": labels.get(r.get("review_status"), labels[None]),
             }
         )
@@ -1036,15 +1113,55 @@ def view_to_verify(db_path: str, lang: str) -> None:
     if checked.empty:
         st.info(t("triage_no_checked", lang))
     else:
+        # Color-coding for this worklist: priority tier reuses the exact
+        # same terciles/classify_priority() as the map and the dossier
+        # badges. The per-row trust/reliability indicator does NOT call
+        # scoring.compute_reliability_report() once per row here -- that
+        # would mean an extra set of evidence/gmaps/address-crosscheck
+        # queries per business, on every render, for a worklist that can
+        # hold hundreds of rows. Instead it uses the cheap uncertainty_score
+        # proxy (see _trust_proxy_badge), which load_worklist() already
+        # joined in with no extra query. The full, accurate reliability
+        # verdict is still shown, but only for the single business currently
+        # chosen in "Open dossier" below -- one compute_reliability_report()
+        # call, not N.
+        terciles = _worklist_priority_terciles(db_path)
+        priority_col = column_labels["prioriteit"]
+        trust_col = t("col_reliability", lang)
+
+        row_colors = {
+            idx: (
+                MAP_CATEGORY_COLORS[classify_priority(r["prioriteit"], terciles)],
+                _trust_proxy_badge(r["onzekerheid"], lang)[1],
+            )
+            for idx, r in checked.iterrows()
+        }
+
+        display = checked.drop(columns=["uidn"]).copy()
+        display[trust_col] = checked["onzekerheid"].apply(
+            lambda u: _trust_proxy_badge(u, lang)[0]
+        )
+        display = display.drop(columns=["onzekerheid"]).rename(columns=column_labels)
+
+        def _highlight_row(row):
+            tier_color, trust_color = row_colors.get(
+                row.name, (MAP_COLOR_UNCHECKED, MAP_COLOR_UNCHECKED)
+            )
+            styles = pd.Series("", index=row.index)
+            styles[priority_col] = f"background-color: {tier_color}33; font-weight: 600;"
+            styles[trust_col] = f"background-color: {trust_color}33; font-weight: 600;"
+            return styles
+
         st.dataframe(
-            checked.drop(columns=["uidn"]).rename(columns=column_labels),
+            display.style.apply(_highlight_row, axis=1).hide(axis="index"),
             use_container_width=True,
-            hide_index=True,
         )
 
     with st.expander(t("triage_unchecked_header", lang, n=len(unchecked))):
         st.dataframe(
-            unchecked.drop(columns=["uidn", "prioriteit"]).rename(columns=column_labels),
+            unchecked.drop(columns=["uidn", "prioriteit", "onzekerheid"]).rename(
+                columns=column_labels
+            ),
             use_container_width=True,
             hide_index=True,
         )
@@ -1057,8 +1174,15 @@ def view_to_verify(db_path: str, lang: str) -> None:
     }
     sorted_labels = sorted(options.keys())
     label = st.selectbox(t("triage_select_business", lang), sorted_labels)
+    selected_uidn = options[label]
+    # Full, accurate reliability verdict, computed for only this one
+    # currently-selected business -- see the comment above the worklist
+    # table for why this is not done for every row.
+    selected_reliability = scoring.compute_reliability_report(selected_uidn, db_path)
+    trust_label, trust_color = _trust_badge(selected_reliability.get("trust"), lang)
+    render_badge_row([(trust_label, trust_color)])
     if st.button(t("triage_open_dossier_button", lang)):
-        st.session_state["selected_uidn"] = options[label]
+        st.session_state["selected_uidn"] = selected_uidn
         # Cannot write "nav" directly here: the sidebar radio widget bound to
         # key="nav" has already been instantiated earlier in this script run
         # (main() creates it before dispatching to this view), and Streamlit
@@ -1083,11 +1207,12 @@ def view_to_verify(db_path: str, lang: str) -> None:
     )
     if st.button(t("triage_run_verification_button", lang), disabled=unchecked.empty):
         candidate_uidns = unchecked["uidn"].tolist()[: int(batch_size)]
+        include_mailbox = st.session_state.get("mailbox_source_enabled", False)
         progress = st.progress(0.0)
         for i, uidn in enumerate(candidate_uidns):
             business = get_business(uidn, db_path)
             if business:
-                scoring.run_all_sources(business, db_path)
+                scoring.run_all_sources(business, db_path, include_mailbox=include_mailbox)
                 scoring.compute_score(uidn, db_path)
             progress.progress((i + 1) / len(candidate_uidns))
         st.cache_data.clear()
@@ -1126,6 +1251,197 @@ def render_persisted_call_outcome(outcome: dict, lang: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+# --------------------------------------------------------------------------
+# Reliability badges, address-conflict callout and sources-overview.
+#
+# Officers see plain words and colors here, not raw internal scores: this is
+# the primary explanation of why the platform does or doesn't trust a
+# business's information, per explicit product direction. The raw numeric
+# scores and the per-evidence-row listing move into a collapsed "Technical
+# details" expander instead (see view_dossier).
+# --------------------------------------------------------------------------
+
+def _worklist_priority_terciles(db_path: str):
+    """Priority terciles over every scored business in the worklist.
+
+    The same ``compute_priority_terciles``/``classify_priority`` pair the
+    map already uses, reused as-is (not re-derived) so the dossier badges,
+    the worklist table and the map all agree on what counts as
+    low/medium/high priority.
+    """
+    rows = load_worklist(db_path)
+    scored = [r.get("priority_score") for r in rows if r.get("priority_score") is not None]
+    return compute_priority_terciles(scored)
+
+
+def render_badge_row(items: list) -> None:
+    """Render a compact row of color-coded pill badges.
+
+    ``items`` is a list of ``(label, hex_color)`` tuples. Pure presentation;
+    used by the dossier's reliability badges and the worklist's per-row
+    trust indicator.
+    """
+    chips = "".join(
+        f'<span style="display:inline-block; padding:4px 12px; margin:2px 8px 2px 0; '
+        f'border-radius:12px; background-color:{color}; color:#ffffff; font-weight:600; '
+        f'font-size:0.85em;">{html.escape(str(label))}</span>'
+        for label, color in items
+    )
+    st.markdown(chips, unsafe_allow_html=True)
+
+
+def _status_badge(status, lang: str):
+    mapping = {
+        "active": (t("reliability_status_active", lang), MAP_COLOR_LOW),
+        "inactive": (t("reliability_status_inactive", lang), MAP_COLOR_HIGH),
+    }
+    return mapping.get(status, (t("reliability_status_unknown", lang), MAP_COLOR_UNCHECKED))
+
+
+def _trust_badge(trust, lang: str):
+    # Defensive default: an unrecognized or missing trust value must never
+    # read as a false "trusted" -- fall back to the amber "needs
+    # verification" state instead (matters for a business that has never
+    # been checked yet).
+    mapping = {
+        "trusted": (t("reliability_trust_trusted", lang), MAP_COLOR_LOW),
+        "needs_verification": (
+            t("reliability_trust_needs_verification", lang),
+            MAP_COLOR_MEDIUM,
+        ),
+    }
+    return mapping.get(trust, (t("reliability_trust_needs_verification", lang), MAP_COLOR_MEDIUM))
+
+
+def _freshness_badge(freshness, lang: str):
+    mapping = {
+        "fresh": (t("reliability_freshness_fresh", lang), MAP_COLOR_LOW),
+        "aging": (t("reliability_freshness_aging", lang), MAP_COLOR_MEDIUM),
+        "stale": (t("reliability_freshness_stale", lang), MAP_COLOR_HIGH),
+    }
+    return mapping.get(freshness, (t("reliability_freshness_stale", lang), MAP_COLOR_HIGH))
+
+
+def _priority_badge(priority_score, terciles, lang: str):
+    category = classify_priority(priority_score, terciles)
+    return map_legend_labels(lang)[category], MAP_CATEGORY_COLORS[category]
+
+
+def _trust_proxy_badge(uncertainty_score, lang: str):
+    """Cheap, no-extra-query proxy for reliability, for the bulk worklist
+    table only (see view_to_verify).
+
+    Derived only from ``uncertainty_score``, which ``load_worklist`` already
+    joins in with no extra query. This is NOT the same computation as
+    ``scoring.compute_reliability_report``'s trust verdict (that also weighs
+    Google Maps review recency and costs a handful of extra queries per
+    business) -- it is a lighter-weight, still-useful stand-in so the full
+    worklist can be color-coded without a per-row database round trip.
+    """
+    if uncertainty_score is None or pd.isna(uncertainty_score):
+        return t("map_legend_unchecked", lang), MAP_COLOR_UNCHECKED
+    if uncertainty_score == 0:
+        return t("reliability_trust_trusted", lang), MAP_COLOR_LOW
+    return t("reliability_trust_needs_verification", lang), MAP_COLOR_MEDIUM
+
+
+def render_reliability_badges(reliability: dict, score, terciles, lang: str) -> None:
+    """Render the compact row of status/trust/freshness/priority badges.
+
+    ``reliability`` is ``scoring.compute_reliability_report(...)``'s return
+    value, ``score`` is ``get_score(...)``'s return value (``None`` if this
+    business has never been scored yet), ``terciles`` are the priority
+    terciles from ``_worklist_priority_terciles``.
+    """
+    reliability = reliability or {}
+    status_label, status_color = _status_badge(reliability.get("status"), lang)
+    trust_label, trust_color = _trust_badge(reliability.get("trust"), lang)
+    freshness_label, freshness_color = _freshness_badge(reliability.get("freshness"), lang)
+    priority_score = score.get("priority_score") if score else None
+    priority_label, priority_color = _priority_badge(priority_score, terciles, lang)
+
+    render_badge_row(
+        [
+            (status_label, status_color),
+            (trust_label, trust_color),
+            (freshness_label, freshness_color),
+            (priority_label, priority_color),
+        ]
+    )
+
+
+def render_address_conflict_callout(note: str, related_uidn, lang: str) -> None:
+    """A distinct, amber-bordered callout for an address conflict.
+
+    ``related_uidn`` (may be ``None``) is the uidn of the other business
+    registered at the same address, per ``address_crosscheck.check()``'s
+    ``related_uidn`` field -- when present, offers a button that navigates
+    to that business's own dossier via the established pending_nav
+    mechanism.
+    """
+    color = MAP_COLOR_MEDIUM
+    st.markdown(
+        f"""
+        <div style="border: 2px solid {color}; padding: 10px 14px; margin: 10px 0;
+                    background-color: rgba(239,108,0,0.10); border-radius: 6px;">
+            <span style="color:{color}; font-weight:700;">
+                &#9888; {html.escape(t("dossier_address_conflict_label", lang))}
+            </span><br/>
+            <span style="font-size:0.95em;">{html.escape(str(note))}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if related_uidn is not None:
+        if st.button(
+            t("dossier_open_related_dossier_button", lang),
+            key=f"open_related_dossier_{related_uidn}",
+        ):
+            # Same pending_nav indirection used elsewhere in this file: "nav"
+            # is a widget-bound session_state key and cannot be reassigned
+            # directly once its radio widget already exists in this run.
+            st.session_state["selected_uidn"] = related_uidn
+            st.session_state["pending_nav"] = "Dossier"
+            st.rerun()
+
+
+def render_sources_overview(evidence_rows: list, lang: str) -> None:
+    """One compact card per evidence source, showing its most recent signal.
+
+    ``evidence_rows`` is this business's evidence rows (see ``get_evidence``);
+    grouped/indexed by ``source`` since every source keeps at most one row
+    per business. Sources with no evidence row yet show a neutral "not yet
+    checked" grey state.
+    """
+    by_source = {row.get("source"): row for row in (evidence_rows or []) if row.get("source")}
+
+    cols = st.columns(3)
+    for i, source_key in enumerate(SOURCE_DISPLAY_ORDER):
+        names = SOURCE_DISPLAY_NAMES.get(source_key, {})
+        name = names.get(lang, names.get("nl", source_key))
+        row = by_source.get(source_key)
+        if row:
+            signal = row.get("signal") or "silent"
+            color = SIGNAL_BADGE_COLORS.get(signal, MAP_COLOR_UNCHECKED)
+            summary = row.get("detail") or t("source_not_yet_checked", lang)
+        else:
+            color = MAP_COLOR_UNCHECKED
+            summary = t("source_not_yet_checked", lang)
+
+        with cols[i % 3]:
+            st.markdown(
+                f"""
+                <div style="border-left: 4px solid {color}; padding: 6px 10px; margin-bottom: 8px;
+                            background-color: rgba(127,127,127,0.08); border-radius: 4px;
+                            min-height: 88px;">
+                    <b>{html.escape(name)}</b><br/>
+                    <span style="font-size:0.85em;">{html.escape(str(summary))}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 # --------------------------------------------------------------------------
@@ -1211,9 +1527,12 @@ def view_dossier(db_path: str, lang: str) -> None:
     st.divider()
     st.subheader(t("dossier_verification_header", lang))
     if st.button(t("dossier_run_verification_button", lang)):
-        with st.spinner(t("dossier_verification_spinner", lang)):
-            scoring.run_all_sources(business, db_path)
-            scoring.compute_score(uidn, db_path)
+        search_animation.render_search_animation(
+            business,
+            db_path,
+            lang,
+            include_mailbox=st.session_state.get("mailbox_source_enabled", False),
+        )
         st.cache_data.clear()
         st.session_state["flash"] = {
             "kind": "success",
@@ -1246,6 +1565,7 @@ def view_dossier(db_path: str, lang: str) -> None:
     evidence_rows = get_evidence(uidn, db_path)
     score = get_score(uidn, db_path)
     dampener = seasonal.seasonal_dampener(business, evidence_rows, date.today().month)
+    reliability = scoring.compute_reliability_report(uidn, db_path)
 
     st.divider()
     st.subheader(t("dossier_case_file_header", lang))
@@ -1257,24 +1577,44 @@ def view_dossier(db_path: str, lang: str) -> None:
         st.caption(t("dossier_internal_debug_caption", lang, reason=dampener["reason"]))
 
     st.divider()
-    st.subheader(t("dossier_score_header", lang))
-    if score:
-        c1, c2, c3 = st.columns(3)
-        c1.metric(t("dossier_metric_uncertainty", lang), score.get("uncertainty_score"))
-        c2.metric(t("dossier_metric_impact", lang), score.get("impact_score"))
-        c3.metric(t("dossier_metric_priority_total", lang), score.get("priority_score"))
-        st.caption(
-            t(
-                "dossier_last_calculated_caption",
-                lang,
-                date=format_date(score.get("updated_at"), lang),
-            )
-        )
-    else:
-        st.info(t("dossier_no_score_info", lang))
+    st.subheader(t("dossier_reliability_header", lang))
+    terciles = _worklist_priority_terciles(db_path)
+    render_reliability_badges(reliability, score, terciles, lang)
+    reason = reliability.get("reason") or ""
+    if reason:
+        st.markdown(f"**{html.escape(reason)}**")
+
+    # Part B: a live, deterministic re-check (log=False, so this never
+    # writes a duplicate evidence row on render) -- gives both the
+    # officer-friendly note text (preferring compute_reliability_report's
+    # own address_note when present) and the conflicting business's
+    # related_uidn for the "open dossier" link below.
+    conflict = address_crosscheck.check(business, db_path, log=False)
+    if conflict.get("signal") == "disagreement":
+        note_text = reliability.get("address_note") or conflict.get("detail")
+        render_address_conflict_callout(note_text, conflict.get("related_uidn"), lang)
 
     st.divider()
-    render_history(business, evidence_rows, lang, db_path)
+    st.subheader(t("dossier_sources_overview_header", lang))
+    render_sources_overview(evidence_rows, lang)
+
+    with st.expander(t("dossier_technical_details_header", lang)):
+        if score:
+            c1, c2, c3 = st.columns(3)
+            c1.metric(t("dossier_metric_uncertainty", lang), score.get("uncertainty_score"))
+            c2.metric(t("dossier_metric_impact", lang), score.get("impact_score"))
+            c3.metric(t("dossier_metric_priority_total", lang), score.get("priority_score"))
+            st.caption(
+                t(
+                    "dossier_last_calculated_caption",
+                    lang,
+                    date=format_date(score.get("updated_at"), lang),
+                )
+            )
+        else:
+            st.info(t("dossier_no_score_info", lang))
+
+        render_history(business, evidence_rows, lang, db_path)
 
     st.divider()
     st.subheader(t("dossier_review_header", lang))
