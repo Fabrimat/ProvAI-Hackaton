@@ -25,6 +25,7 @@ import streamlit as st
 
 from app.db import get_connection
 from app.ingest import list_businesses
+from app.ui import theme
 
 _AI_STRINGS = {
     "nl": {
@@ -33,6 +34,7 @@ _AI_STRINGS = {
             "Stel een vraag over een geregistreerde onderneming en krijg een "
             "antwoord opgesteld op basis van alle gekoppelde databronnen."
         ),
+        "conversation_label": "Gesprek",
         "chat_input_placeholder": "Stel hier je vraag...",
         "suggestion_1": "Zoek alle frituren in de buurt van het centrum.",
         "suggestion_2": "Welke bedrijven zijn recent bevestigd actief?",
@@ -71,6 +73,7 @@ _AI_STRINGS = {
             "Ask a question about any registered business and get an answer "
             "compiled from all connected data sources."
         ),
+        "conversation_label": "Conversation",
         "chat_input_placeholder": "Ask your question here...",
         "suggestion_1": "Find all fry shops near the town center.",
         "suggestion_2": "Which businesses were recently confirmed active?",
@@ -343,6 +346,38 @@ def _pick_example_business_name(db_path: str):
     return None
 
 
+def _inject_chip_button_css() -> None:
+    """Style this page's st.button widgets (the suggestion chips) to match
+    the mockup's ``.chip``: left-aligned text, white background, thin
+    neutral border, sharp corners, accent tint on hover.
+
+    Scoped by only ever being injected from this page's own render(), and
+    by this page having no other buttons than the suggestion chips.
+    """
+    st.markdown(
+        f"""
+        <style>
+        div[data-testid="stButton"] > button {{
+            width: 100%;
+            text-align: left;
+            justify-content: flex-start;
+            background-color: #fff;
+            border: 1px solid {theme.COLOR_NEUTRAL_300};
+            border-radius: 0;
+            color: inherit;
+            font-weight: 400;
+        }}
+        div[data-testid="stButton"] > button:hover {{
+            border-color: {theme.COLOR_ACCENT};
+            background-color: {theme.COLOR_ACCENT_100};
+            color: {theme.COLOR_ACCENT_700};
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _play_thinking_animation(strings: dict) -> None:
     """Play a short, fixed thinking sequence in one reused placeholder.
 
@@ -385,6 +420,11 @@ def render(db_path: str, lang: str) -> None:
         strings["suggestion_3"],
         suggestion_4,
     ]
+
+    _inject_chip_button_css()
+    st.markdown(
+        theme.panel_header(strings["conversation_label"]), unsafe_allow_html=True
+    )
 
     clicked_text = None
     columns = st.columns(len(suggestion_texts))
