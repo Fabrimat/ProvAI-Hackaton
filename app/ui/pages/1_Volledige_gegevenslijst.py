@@ -24,10 +24,12 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from app.db import get_connection  # noqa: E402
+from app.ui import theme  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
 st.set_page_config(page_title="Volledige gegevenslijst", layout="wide")
+theme.inject()
 
 # Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav) so
 # only the main app's custom sidebar navigation is visible -- otherwise both
@@ -53,6 +55,17 @@ STATUS_LABELS_NL = {
     "pending": "Nog te controleren",
     "confirmed_active": "Bevestigd: actief",
     "confirmed_inactive": "Bevestigd: inactief",
+}
+
+# Small dot + label tag styling for the "Beoordelingsstatus" column, matching
+# the mockup's ".stg"/".st-unknown"/".st-low" tags: an outline dot for a
+# business that has not been checked yet, a filled dark-neutral dot once a
+# status has been confirmed (either way) -- not a red/orange/green traffic
+# light, per the mockup's semantic palette.
+STATUS_DOT_STYLE_NL = {
+    "Nog te controleren": ("○", theme.COLOR_UNKNOWN),
+    "Bevestigd: actief": ("●", theme.COLOR_SETTLED),
+    "Bevestigd: inactief": ("●", theme.COLOR_SETTLED),
 }
 
 # Column order + Dutch header labels for every ``businesses`` field, plus the
@@ -265,7 +278,17 @@ def main() -> None:
 
     df_all = build_dataframe(raw_rows)
 
-    with st.expander("Filters", expanded=True):
+    # Filter toolbar, styled as a bordered strip (the mockup's ".panel" look)
+    # instead of a collapsible expander -- the filters here are cheap and
+    # meant to stay visible while scanning the table below them.
+    st.markdown(
+        '<div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;'
+        'color:#605d5d;margin-bottom:6px;">Filters</div>'
+        '<style>div[data-testid="stVerticalBlockBorderWrapper"]{'
+        "background:#f8f4f4;border-color:#d7d3d3 !important;}</style>",
+        unsafe_allow_html=True,
+    )
+    with st.container(border=True):
         col1, col2 = st.columns(2)
         with col1:
             search_text = st.text_input(
@@ -298,7 +321,31 @@ def main() -> None:
 
     st.write(f"{len(df_filtered)} van de {len(df_all)} bedrijven getoond")
 
-    st.dataframe(df_filtered, use_container_width=True, hide_index=True)
+    # Beoordelingsstatus (the review status/signal column) gets the mockup's
+    # small dot + label tag treatment instead of plain text -- presentation
+    # only, the underlying review_status value and every other column are
+    # untouched.
+    status_col = COLUMN_LABELS_NL["review_status_label"]
+    original_status = df_filtered[status_col]
+    df_display = df_filtered.copy()
+    df_display[status_col] = original_status.map(
+        lambda label: STATUS_DOT_STYLE_NL.get(label, STATUS_DOT_STYLE_NL["Nog te controleren"])[0]
+        + " "
+        + str(label)
+    )
+
+    def _highlight_status(row):
+        styles = pd.Series("", index=row.index)
+        _, color = STATUS_DOT_STYLE_NL.get(
+            original_status.get(row.name), STATUS_DOT_STYLE_NL["Nog te controleren"]
+        )
+        styles[status_col] = f"color: {color}; font-weight: 600;"
+        return styles
+
+    st.dataframe(
+        df_display.style.apply(_highlight_status, axis=1).hide(axis="index"),
+        use_container_width=True,
+    )
 
 
 main()

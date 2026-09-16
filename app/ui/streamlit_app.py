@@ -1136,6 +1136,33 @@ def view_dashboard(db_path: str, lang: str) -> None:
 # View 2 -- Te verifiëren (the actionable queue)
 # --------------------------------------------------------------------------
 
+# Small dot + label tag styling for the worklist table, matching the
+# mockup's ".stg"/".st-unknown"/".st-high"/".st-medium"/".st-low" tags
+# (theme.py's semantic palette, not the red/orange/green MAP_COLOR_* one
+# the map and dossier badges use). This only changes how a row's existing
+# MAP_COLOR_* value is drawn here -- the category itself still comes from
+# the same classify_priority()/_trust_proxy_badge() calls as before.
+_MOCKUP_DOT_STYLE_BY_MAP_COLOR = {
+    MAP_COLOR_UNCHECKED: ("○", theme.COLOR_UNKNOWN),  # outline dot, grey
+    MAP_COLOR_LOW: ("●", theme.COLOR_SETTLED),  # filled dot, dark neutral
+    MAP_COLOR_MEDIUM: ("●", theme.COLOR_ACCENT_LIGHT),  # filled dot, light accent
+    MAP_COLOR_HIGH: ("●", theme.COLOR_ACCENT),  # filled dot, accent
+}
+
+
+def _mockup_dot_style(map_color_hex: str):
+    """Map a MAP_COLOR_* hex to a mockup-style ``(glyph, text_color)`` pair."""
+    return _MOCKUP_DOT_STYLE_BY_MAP_COLOR.get(
+        map_color_hex, ("○", theme.COLOR_UNKNOWN)
+    )
+
+
+def _dot_label(label: str, map_color_hex: str) -> str:
+    """Prefix ``label`` with the mockup's small dot glyph for ``map_color_hex``."""
+    glyph, _ = _mockup_dot_style(map_color_hex)
+    return f"{glyph} {label}"
+
+
 def view_to_verify(db_path: str, lang: str) -> None:
     """The action queue: what needs manual verification, and controls to act.
 
@@ -1213,17 +1240,19 @@ def view_to_verify(db_path: str, lang: str) -> None:
 
         display = checked.drop(columns=["uidn"]).copy()
         display[trust_col] = checked["onzekerheid"].apply(
-            lambda u: _trust_proxy_badge(u, lang)[0]
+            lambda u: _dot_label(*_trust_proxy_badge(u, lang))
         )
         display = display.drop(columns=["onzekerheid"]).rename(columns=column_labels)
 
         def _highlight_row(row):
-            tier_color, trust_color = row_colors.get(
+            tier_map_color, trust_map_color = row_colors.get(
                 row.name, (MAP_COLOR_UNCHECKED, MAP_COLOR_UNCHECKED)
             )
+            _, tier_dot_color = _mockup_dot_style(tier_map_color)
+            _, trust_dot_color = _mockup_dot_style(trust_map_color)
             styles = pd.Series("", index=row.index)
-            styles[priority_col] = f"background-color: {tier_color}33; font-weight: 600;"
-            styles[trust_col] = f"background-color: {trust_color}33; font-weight: 600;"
+            styles[priority_col] = f"color: {tier_dot_color}; font-weight: 700;"
+            styles[trust_col] = f"color: {trust_dot_color}; font-weight: 600;"
             return styles
 
         st.dataframe(
