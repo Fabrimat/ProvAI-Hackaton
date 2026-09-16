@@ -24,6 +24,8 @@ import time
 
 import streamlit as st
 
+from app.ui import theme
+
 _DS_STRINGS = {
     "nl": {
         "header": "Databronnen",
@@ -150,8 +152,13 @@ _BASE_SOURCES = [
     ("source_address_name", "source_address_desc"),
 ]
 
-_ACTIVE_BADGE_COLOR = "#2e7d32"
-_AVAILABLE_BADGE_COLOR = "#9e9e9e"
+# Thin border used for card outlines and the grid's own "hairline" gaps
+# (the grid background shows through the 1px gap between cells).
+_CARD_BORDER = theme.COLOR_NEUTRAL_300
+_CARD_GRID_STYLE = (
+    "display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); "
+    f"gap:1px; background-color:{_CARD_BORDER}; border:1px solid {_CARD_BORDER};"
+)
 
 # List of available connectors: (emoji, name) tuples for the gallery section.
 _AVAILABLE_CONNECTORS = [
@@ -169,43 +176,84 @@ def _s(strings: dict, key: str) -> str:
     return strings.get(key, key)
 
 
-def _render_source_row(name: str, description: str, badge_label: str) -> None:
-    name = html.escape(str(name))
-    description = html.escape(str(description))
-    badge_label = html.escape(str(badge_label))
-
-    st.markdown(
-        f"""
-        <div style="border-left: 4px solid {_ACTIVE_BADGE_COLOR}; padding: 8px 12px;
-                    margin-bottom: 6px; background-color: rgba(127,127,127,0.08);
-                    border-radius: 4px;">
-            <b>{name}</b>
-            <span style="float:right; background-color:{_ACTIVE_BADGE_COLOR}; color:white;
-                        font-size:0.75em; font-weight:600; padding:2px 8px; border-radius:10px;">
-                {badge_label}
-            </span>
-            <br/>
-            <span style="font-size:0.9em; color:#666;">{description}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def _badge_html(label: str, connected: bool) -> str:
+    """A small status tag: solid dark when connected, outlined when not."""
+    label = html.escape(str(label))
+    if connected:
+        return (
+            '<span style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; '
+            f'font-weight:600; background-color:{theme.COLOR_NEUTRAL_800}; color:#fff; '
+            f'padding:2px 7px;">{label}</span>'
+        )
+    return (
+        '<span style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; '
+        f'font-weight:600; border:1px solid {_CARD_BORDER}; padding:1px 6px; '
+        f'color:{theme.COLOR_NEUTRAL_700};">{label}</span>'
     )
 
 
-def _render_active_sources(strings: dict, mailbox_enabled: bool) -> None:
-    st.subheader(_s(strings, "active_subheader"))
+def _connector_card_html(
+    name: str, description: str, badge_label: str, connected: bool, icon: str = ""
+) -> str:
+    """One bordered connector cell for the cards grid.
 
-    for name_key, desc_key in _BASE_SOURCES:
-        _render_source_row(
-            _s(strings, name_key), _s(strings, desc_key), _s(strings, "active_badge")
+    ``icon``, when given, is reused as-is (an emoji already assigned to
+    that connector elsewhere in this module) inside a small bordered
+    square; connectors without an assigned icon simply render without one.
+    """
+    name = html.escape(str(name))
+    icon_html = ""
+    if icon:
+        icon_html = (
+            f'<div style="width:32px; height:32px; border:1px solid {_CARD_BORDER}; '
+            f'display:grid; place-items:center; color:{theme.COLOR_ACCENT}; flex:none; '
+            f'font-size:1.05em;">{html.escape(str(icon))}</div>'
         )
+    desc_html = ""
+    if description:
+        desc_html = (
+            f'<div style="font-size:12.5px; line-height:1.45; '
+            f'color:{theme.COLOR_NEUTRAL_700};">{html.escape(str(description))}</div>'
+        )
+    return f"""
+    <div style="background-color:#fff; padding:14px; display:flex;
+                flex-direction:column; gap:10px; min-height:110px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+            {icon_html}
+            <div style="margin-left:auto;">{_badge_html(badge_label, connected)}</div>
+        </div>
+        <div>
+            <div style="font-weight:600; font-size:14.5px; line-height:1.3;">{name}</div>
+            {desc_html}
+        </div>
+    </div>
+    """
 
+
+def _render_active_sources(strings: dict, mailbox_enabled: bool) -> None:
+    st.markdown(
+        theme.panel_header(_s(strings, "active_subheader")), unsafe_allow_html=True
+    )
+
+    cards_html = f'<div style="{_CARD_GRID_STYLE}">'
+    for name_key, desc_key in _BASE_SOURCES:
+        cards_html += _connector_card_html(
+            _s(strings, name_key),
+            _s(strings, desc_key),
+            _s(strings, "active_badge"),
+            connected=True,
+        )
     if mailbox_enabled:
-        _render_source_row(
+        cards_html += _connector_card_html(
             _s(strings, "source_mailbox_name"),
             _s(strings, "source_mailbox_desc"),
             _s(strings, "active_badge"),
+            connected=True,
         )
+    cards_html += "</div>"
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    if mailbox_enabled:
         _, remove_col = st.columns([5, 1])
         with remove_col:
             if st.button(_s(strings, "remove_mailbox_button"), key="ds_remove_mailbox"):
@@ -227,9 +275,8 @@ def _play_mailbox_analysis_animation(strings: dict) -> None:
 
     placeholder.markdown(
         f"""
-        <div style="border-left: 4px solid {_ACTIVE_BADGE_COLOR}; padding: 8px 12px;
-                    margin-bottom: 6px; background-color: rgba(127,127,127,0.08);
-                    border-radius: 4px;">
+        <div style="border:1px solid {_CARD_BORDER}; border-left:4px solid {theme.COLOR_ACCENT};
+                    padding: 8px 12px; margin-bottom: 6px; background-color:#fff;">
             <span style="font-size:0.9em;">{html.escape(_s(strings, "results_summary"))}</span>
         </div>
         """,
@@ -238,7 +285,9 @@ def _play_mailbox_analysis_animation(strings: dict) -> None:
 
 
 def _render_add_source_flow(strings: dict) -> None:
-    st.subheader(_s(strings, "add_new_subheader"))
+    st.markdown(
+        theme.panel_header(_s(strings, "add_new_subheader")), unsafe_allow_html=True
+    )
     st.write(_s(strings, "add_new_intro"))
 
     st.text_area(
@@ -266,33 +315,18 @@ def _render_available_connectors(strings: dict) -> None:
     This section is purely informational and contains no interactive elements.
     Each connector is displayed with an emoji icon, name, and neutral badge.
     """
-    st.subheader(_s(strings, "available_connectors_header"))
-
-    # Build HTML grid of connector cards
-    html_content = (
-        '<div style="display: grid; grid-template-columns: repeat(auto-fit, '
-        'minmax(160px, 1fr)); gap: 12px;">'
+    st.markdown(
+        theme.panel_header(_s(strings, "available_connectors_header")),
+        unsafe_allow_html=True,
     )
 
+    cards_html = f'<div style="{_CARD_GRID_STYLE}">'
     for emoji, name in _AVAILABLE_CONNECTORS:
-        html_content += f"""
-        <div style="border-left: 4px solid {_AVAILABLE_BADGE_COLOR}; padding: 8px 12px;
-                    background-color: rgba(127,127,127,0.08);
-                    border-radius: 4px; text-align: center;">
-            <div style="font-size: 2em; margin-bottom: 8px;">{emoji}</div>
-            <b>{html.escape(name)}</b>
-            <br/>
-            <span style="font-size:0.75em; background-color:{_AVAILABLE_BADGE_COLOR};
-                        color:white; font-weight:600; padding:2px 8px;
-                        border-radius:10px; display:inline-block;
-                        margin-top: 6px;">
-                {_s(strings, "available_badge")}
-            </span>
-        </div>
-        """
-
-    html_content += "</div>"
-    st.markdown(html_content, unsafe_allow_html=True)
+        cards_html += _connector_card_html(
+            name, "", _s(strings, "available_badge"), connected=False, icon=emoji
+        )
+    cards_html += "</div>"
+    st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def render(db_path: str, lang: str) -> None:
