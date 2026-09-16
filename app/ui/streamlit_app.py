@@ -197,8 +197,7 @@ TRANSLATIONS = {
         "dossier_verification_header": "Verificatie",
         "dossier_run_verification_button": "Voer verificatie uit",
         "dossier_verification_success": "Verificatie voltooid.",
-        "dossier_call_simulation_button": "Simuleer telefoongesprek",
-        "dossier_call_simulation_success": "Gesprek afgerond en gelogd als bewijs.",
+        "dossier_call_simulation_button": "Bel dit bedrijf",
         "dossier_case_file_header": "Case-dossier",
         "dossier_internal_debug_caption": "(interne detail, EN: {reason})",
         "dossier_reliability_header": "Betrouwbaarheid",
@@ -350,8 +349,7 @@ TRANSLATIONS = {
         "dossier_verification_header": "Verification",
         "dossier_run_verification_button": "Run verification",
         "dossier_verification_success": "Verification completed.",
-        "dossier_call_simulation_button": "Simulate phone call",
-        "dossier_call_simulation_success": "Call completed and logged as evidence.",
+        "dossier_call_simulation_button": "Call this business",
         "dossier_case_file_header": "Case file",
         "dossier_internal_debug_caption": "(internal detail, EN: {reason})",
         "dossier_reliability_header": "Reliability",
@@ -1223,36 +1221,6 @@ def view_to_verify(db_path: str, lang: str) -> None:
         st.rerun()
 
 
-def render_persisted_call_outcome(outcome: dict, lang: str) -> None:
-    """Redraw a persisted call-simulation result card after a rerun.
-
-    render_call_simulation's own result card is wiped by the st.rerun() that
-    follows it (see the call-simulation button handler in view_dossier), so
-    this redraws an equivalent card from the outcome stashed in
-    st.session_state["last_call_outcome"]. Reuses call_animation's own
-    color/label mapping and translation helper (module-private, but that is
-    Python convention, not enforcement -- kept as-is rather than duplicating
-    the color palette and labels here) so the persisted card matches the
-    live animation exactly.
-    """
-    signal = outcome.get("signal") or "silent"
-    detail = html.escape(str(outcome.get("detail") or ""))
-    color = call_animation._RESULT_COLORS.get(signal, "#757575")
-    label_key = call_animation._RESULT_LABEL_KEYS.get(signal, "result_silent")
-    result_label = call_animation._s(label_key, lang)
-    detail_label = call_animation._s("detail_label", lang)
-    st.markdown(
-        f"""
-        <div style="border-left: 4px solid {color}; padding: 8px 12px; margin-bottom: 6px;
-                    background-color: rgba(127,127,127,0.08); border-radius: 4px;">
-            <span style="color:{color}; font-weight:700;">{result_label}</span><br/>
-            <span style="font-size:0.9em;">{detail_label}: {detail}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 # --------------------------------------------------------------------------
 # Reliability badges, address-conflict callout and sources-overview.
 #
@@ -1541,26 +1509,7 @@ def view_dossier(db_path: str, lang: str) -> None:
         st.rerun()
 
     if st.button(t("dossier_call_simulation_button", lang)):
-        outcome = call_animation.render_call_simulation(business, db_path, lang)
-        scoring.compute_score(uidn, db_path)
-        st.cache_data.clear()
-        # Stash the outcome (scoped to this uidn) so it can be redrawn after
-        # the rerun below wipes render_call_simulation's own result card --
-        # see render_persisted_call_outcome().
-        st.session_state["last_call_outcome"] = {
-            "uidn": uidn,
-            "signal": outcome.get("signal") or "silent",
-            "detail": outcome.get("detail") or "",
-        }
-        st.session_state["flash"] = {
-            "kind": "success",
-            "text": t("dossier_call_simulation_success", lang),
-        }
-        st.rerun()
-
-    last_call_outcome = st.session_state.get("last_call_outcome")
-    if last_call_outcome and last_call_outcome.get("uidn") == uidn:
-        render_persisted_call_outcome(last_call_outcome, lang)
+        call_animation.open_call_dialog(business, db_path, lang)
 
     evidence_rows = get_evidence(uidn, db_path)
     score = get_score(uidn, db_path)
