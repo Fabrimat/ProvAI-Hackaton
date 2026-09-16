@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-6d9acb16-1ffc-4d9c-997f-aaa92b7d6ef0/styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="_ds/modernist-6d9acb16-1ffc-4d9c-997f-aaa92b7d6ef0/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#fff;color:var(--color-text);font-family:var(--font-body);font-size:14px}
+a{color:var(--color-accent-700)}
+a:hover{color:var(--color-accent-800)}
+@keyframes wv{0%,100%{transform:scaleY(.16)}50%{transform:scaleY(1)}}
+@keyframes pls{0%{opacity:.5;transform:scale(1)}80%{opacity:0;transform:scale(2.6)}100%{opacity:0;transform:scale(2.6)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.nb{font-size:13px;background:transparent;border:0;border-bottom:2px solid transparent;cursor:pointer;font-family:var(--font-body);padding:8px 12px;color:var(--color-neutral-800)}
+.nb:hover{background:var(--color-neutral-200);color:var(--color-text)}
+.nb.on{border-bottom-color:var(--color-accent);color:var(--color-text);font-weight:600}
+.btn{white-space:nowrap;flex:none}
+.leaflet-container{z-index:0}
+.leaflet-pane,.leaflet-top,.leaflet-bottom,.leaflet-control{z-index:1}
+.lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700)}
+.panel{border:1px solid var(--color-neutral-300);background:#fff}
+.ph{padding:10px 14px;border-bottom:1px solid var(--color-neutral-300);display:flex;justify-content:space-between;align-items:baseline;gap:12px;background:var(--color-neutral-100)}
+.chip{cursor:pointer;text-align:left;font-family:var(--font-body);font-size:13px;line-height:1.4;background:#fff;border:1px solid var(--color-neutral-400);padding:10px 12px;color:var(--color-text)}
+.chip:hover{border-color:var(--color-accent);background:var(--color-accent-100)}
+.row{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--color-neutral-200);align-items:flex-start}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:8px 14px;border-bottom:1px solid var(--color-neutral-200);font-size:13px}
+th{text-align:left;padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-700);border-bottom:1px solid var(--color-neutral-300);background:var(--color-neutral-100);font-weight:600}
+td{padding:10px 12px;border-bottom:1px solid var(--color-neutral-200);font-size:13px;vertical-align:top}
+.stg{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap}
+.stg::before{content:"";width:8px;height:8px;flex:none}
+.st-unknown{color:var(--color-neutral-700)}
+.st-unknown::before{border:1.5px solid var(--color-neutral-500)}
+.st-high{color:var(--color-accent-700);font-weight:600}
+.st-high::before{background:var(--color-accent)}
+.st-medium{color:var(--color-accent-700)}
+.st-medium::before{background:#f2765d}
+.st-low{color:var(--color-neutral-900)}
+.st-low::before{background:var(--color-neutral-800)}
+.lnk{background:transparent;border:0;padding:0;font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--color-text);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--color-neutral-400)}
+.lnk:hover{color:var(--color-accent-700);text-decoration-color:var(--color-accent)}
+.stat{padding:12px 14px;border-right:1px solid var(--color-neutral-200)}
+.statn{font-family:var(--font-heading);font-weight:700;font-size:28px;line-height:1.15;letter-spacing:-.02em}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;background:#fff;padding-bottom:64px">
+
+  <header style="display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid var(--color-neutral-300);background:#fff;position:sticky;top:0;z-index:40;flex-wrap:wrap">
+    <div style="display:flex;align-items:baseline;gap:10px;padding:12px 0">
+      <span style="font-family:var(--font-heading);font-weight:700;font-size:16px">Business Pulse</span>
+      <span class="lbl">Gemeente Schoten</span>
+    </div>
+    <nav style="display:flex;gap:0;margin-left:10px;flex-wrap:wrap">
+      <button class="nb {{ navMap }}" onClick="{{ goMap }}">Map</button>
+      <button class="nb {{ navSources }}" onClick="{{ goSources }}">Data sources</button>
+      <button class="nb {{ navQueue }}" onClick="{{ goQueue }}">To verify</button>
+      <button class="nb {{ navAll }}" onClick="{{ goAll }}">All businesses</button>
+      <button class="nb {{ navDossier }}" onClick="{{ goDossier }}">Case file</button>
+      <button class="nb {{ navChat }}" onClick="{{ goChat }}">AI assistant</button>
+    </nav>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div style="display:flex;border:1px solid var(--color-neutral-400)">
+        <span style="padding:2px 8px;font-size:11px;color:var(--color-neutral-700)">NL</span>
+        <span style="padding:2px 8px;font-size:11px;background:var(--color-neutral-800);color:#fff">EN</span>
+      </div>
+      <span style="font-size:12px;color:var(--color-neutral-700)">L. Vermeiren, economy desk</span>
+    </div>
+  </header>
+
+  <main style="flex:1;width:100%;max-width:1520px;margin:0 auto;padding:22px 20px">
+
+    <!-- 1. MAP -->
+    <sc-if value="{{ isMap }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:16px">
+        <div>
+          <div class="lbl">Monitoring</div>
+          <h2 style="margin:2px 0 6px;font-size:24px">Business register, Schoten</h2>
+          <p style="max-width:70ch;margin:0;font-size:13.5px;color:var(--color-neutral-800);text-wrap:pretty">Every point is a business the KBO register says exists. The register does not say whether it still trades, where it trades now, or how to reach it. Today we cannot tell a verified business from an unverified one.</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onClick="{{ goSources }}">Data sources</button>
+          <button class="btn btn-primary" onClick="{{ startCheck }}">{{ checkBtnLabel }}</button>
+        </div>
+      </div>
+
+      <div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:18px">
+        <div class="stat">
+          <div class="lbl">Registered</div>
+          <div class="statn">1 000</div>
+          <div style="font-size:12px;color:var(--color-neutral-700)">VKBO snapshot, 2026-09-07</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">In this view</div>
+          <div class="statn">759</div>
+          <div style="font-size:12px;color:var(--color-neutral-700)">Schoten centre, 3.4 km²</div>
+        </div>
+        <div class="stat">
+          <div class="lbl">Status unknown</div>
+          <div class="statn" style="color:var(--color-accent-700)">{{ unknownCount }}</div>
+          <div style="font-size:12px;color:var(--color-neutral-700)">never checked externally</div>
+        </div>
+        <div class="stat" style="border-right:0">
+          <div class="lbl">Officer capacity</div>
+          <div class="statn">12 <span style="font-size:15px;font-weight:400">per week</span></div>
+          <div style="font-size:12px;color:var(--color-neutral-700)">manual checks, 1 FTE</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 284px;gap:20px;align-items:start">
+        <figure style="margin:0">
+          <div ref="{{ mapRef }}" style="width:100%;height:540px;border:1px solid var(--color-neutral-400);background:var(--color-neutral-100)"></div>
+          <figcaption style="display:flex;justify-content:space-between;gap:16px;padding-top:8px;flex-wrap:wrap;font-size:11px;color:var(--color-neutral-700)">
+            <span>759 KBO establishments in the centre of Schoten, plotted on OpenStreetMap</span>
+            <span>EPSG:4326, agentschap Digitaal Vlaanderen</span>
+          </figcaption>
+        </figure>
+
+        <aside style="display:flex;flex-direction:column;gap:16px">
+          <div class="panel">
+            <div class="ph"><span class="lbl">Legend</span></div>
+            <div style="display:flex;flex-direction:column;gap:9px;font-size:13px;padding:12px 14px">
+              <div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;border:1.5px solid var(--color-neutral-500);flex:none"></span>Status unknown</div>
+              <div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;background:var(--color-accent);flex:none"></span>Conflicting data, high priority</div>
+              <div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;background:var(--color-accent-400);flex:none"></span>Needs a look, medium</div>
+              <div style="display:flex;align-items:center;gap:9px"><span style="width:9px;height:9px;background:var(--color-neutral-800);flex:none"></span>Verified active</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="lbl">Source coverage</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Connected sources</span><b>{{ connectedCount }}</b></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Checked, last 30 days</span><b>{{ checkedCount }}</b></div>
+            <div class="kv" style="border-bottom:0"><span style="color:var(--color-neutral-700)">Evidence rows</span><b>{{ evidenceCount }}</b></div>
+            <p style="font-size:12.5px;margin:0;padding:12px 14px;border-top:1px solid var(--color-neutral-200);color:var(--color-neutral-700);text-wrap:pretty">Each source writes one evidence row per business. A source never decides. The officer does.</p>
+          </div>
+        </aside>
+      </div>
+    </sc-if>
+
+    <!-- 2. DATA SOURCES -->
+    <sc-if value="{{ isSources }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:18px">
+        <div>
+          <div class="lbl">Configuration</div>
+          <h2 style="margin:2px 0 6px;font-size:24px">Data sources</h2>
+          <p style="max-width:70ch;margin:0;font-size:13.5px;color:var(--color-neutral-800)">Everything the platform may consult when it verifies a business: public directories, map data, review sites and the municipality's own inbox.</p>
+        </div>
+        <button class="btn btn-primary" onClick="{{ openSourcesModal }}">Add data source</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));gap:1px;background:var(--color-neutral-300);border:1px solid var(--color-neutral-300)">
+        <sc-for list="{{ connectors }}" as="c" hint-placeholder-count="10">
+          <div style="background:#fff;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:148px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+              <div style="width:34px;height:34px;border:1px solid var(--color-neutral-400);display:grid;place-items:center;color:var(--color-accent);flex:none">{{ c.icon }}</div>
+              <sc-if value="{{ c.connected }}" hint-placeholder-val="{{ true }}">
+                <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;background:var(--color-neutral-800);color:#fff;padding:2px 7px">Connected</span>
+              </sc-if>
+              <sc-if value="{{ c.pending }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;border:1px solid var(--color-neutral-400);padding:1px 6px;color:var(--color-neutral-700)">Available</span>
+              </sc-if>
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:14.5px;line-height:1.3">{{ c.name }}</div>
+              <div style="font-size:12.5px;line-height:1.45;color:var(--color-neutral-700);text-wrap:pretty">{{ c.desc }}</div>
+            </div>
+            <div style="margin-top:auto;display:flex;justify-content:space-between;gap:8px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-600);border-top:1px solid var(--color-neutral-200);padding-top:8px">
+              <span>{{ c.kind }}</span><span>{{ c.meta }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:16px;margin-top:18px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onClick="{{ loadMore }}">{{ loadMoreLabel }}</button>
+        <span style="font-size:12.5px;color:var(--color-neutral-700)">{{ connectorSummary }}</span>
+      </div>
+    </sc-if>
+
+    <!-- 3. TO VERIFY -->
+    <sc-if value="{{ isQueue }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-bottom:16px">
+        <div class="lbl">Worklist</div>
+        <h2 style="margin:2px 0 6px;font-size:24px">To verify, ranked by priority</h2>
+        <p style="max-width:70ch;margin:0;font-size:13.5px;color:var(--color-neutral-800)">Produced by the automated check as uncertainty times impact. Businesses whose sources disagree rise to the top.</p>
+      </div>
+      <div class="panel">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr><th>Business</th><th>Address on file</th><th>Activity</th><th>Conflicts</th><th>Priority</th><th></th></tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ queue }}" as="q" hint-placeholder-count="7">
+              <tr>
+                <td style="font-weight:600">{{ q.name }}</td>
+                <td>{{ q.addr }}</td>
+                <td style="color:var(--color-neutral-700)">{{ q.nace }}</td>
+                <td>{{ q.conflicts }}</td>
+                <td style="font-family:var(--font-heading);font-weight:700;font-size:15px">{{ q.score }}</td>
+                <td style="text-align:right"><button class="btn btn-ghost" onClick="{{ goDossier }}">Open</button></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </sc-if>
+
+    <!-- 3b. ALL BUSINESSES -->
+    <sc-if value="{{ isAll }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:16px">
+        <div>
+          <div class="lbl">Register</div>
+          <h2 style="margin:2px 0 6px;font-size:24px">All businesses</h2>
+          <p style="max-width:70ch;margin:0;font-size:13.5px;color:var(--color-neutral-800)">The full KBO extract for the centre of Schoten, with whatever the connected sources have told us about each record.</p>
+        </div>
+        <button class="btn btn-secondary" onClick="{{ resetFilters }}">Clear filters</button>
+      </div>
+
+      <div class="panel" style="display:flex;gap:10px;padding:12px 14px;flex-wrap:wrap;align-items:flex-end;background:var(--color-neutral-100)">
+        <label style="display:flex;flex-direction:column;gap:4px;flex:2;min-width:220px">
+          <span class="lbl">Search name or address</span>
+          <input class="input" placeholder="frituur, Paalstraat, uitzend" value="{{ fQuery }}" onChange="{{ onQuery }}">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:150px">
+          <span class="lbl">Status</span>
+          <select class="input" value="{{ fStatus }}" onChange="{{ onStatus }}">
+            <option value="all">All statuses</option>
+            <option value="unknown">Status unknown</option>
+            <option value="high">Conflicting data</option>
+            <option value="medium">Needs a look</option>
+            <option value="low">Verified active</option>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
+          <span class="lbl">Sector</span>
+          <select class="input" value="{{ fSector }}" onChange="{{ onSector }}">
+            <option value="all">All sectors</option>
+            <sc-for list="{{ sectorOptions }}" as="o" hint-placeholder-count="6">
+              <option value="{{ o.name }}">{{ o.name }}</option>
+            </sc-for>
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px">
+          <span class="lbl">Street</span>
+          <select class="input" value="{{ fStreet }}" onChange="{{ onStreet }}">
+            <option value="all">All streets</option>
+            <sc-for list="{{ streetOptions }}" as="o2" hint-placeholder-count="8">
+              <option value="{{ o2.name }}">{{ o2.name }}</option>
+            </sc-for>
+          </select>
+        </label>
+      </div>
+
+      <div style="display:flex;gap:16px;align-items:baseline;padding:12px 2px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600">{{ resultCount }}</span>
+        <span style="font-size:12.5px;color:var(--color-neutral-700)">{{ resultBreakdown }}</span>
+      </div>
+
+      <div class="panel">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr><th>Business</th><th>Address</th><th>Sector</th><th>Enterprise number</th><th>Status</th><th>Last signal</th></tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ allRows }}" as="b" hint-placeholder-count="12">
+              <tr>
+                <td><button class="lnk" onClick="{{ b.open }}">{{ b.name }}</button></td>
+                <td>{{ b.addr }}</td>
+                <td style="color:var(--color-neutral-700)">{{ b.sector }}</td>
+                <td style="color:var(--color-neutral-700)">{{ b.nr }}</td>
+                <td><span class="stg {{ b.cls }}">{{ b.status }}</span></td>
+                <td style="color:var(--color-neutral-700)">{{ b.when }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="padding:10px 14px;border-top:1px solid var(--color-neutral-200);font-size:12.5px;color:var(--color-neutral-700)">{{ tableFoot }}</div>
+      </div>
+    </sc-if>
+
+    <!-- 4. CASE FILE -->
+    <sc-if value="{{ isDossier }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:18px">
+        <div>
+          <div class="lbl">Case file, UIDN 10 193 447</div>
+          <h2 style="margin:2px 0 6px;font-size:24px">Demo Uitzendkantoor Schoten</h2>
+          <div style="font-size:13px;color:var(--color-neutral-800);line-height:1.6">
+            {{ dossierAddress }} · {{ dossierEmail }}<br>
+            Enterprise 0784.512.903, establishment 2.341.880.552. Temporary staffing agency activities, NACE 78200.<br>
+            Registered 2019-03-14. Fictional demonstration record.
+          </div>
+          <sc-if value="{{ approved }}" hint-placeholder-val="{{ false }}">
+            <div style="display:inline-flex;gap:8px;align-items:center;margin-top:8px;border:1px solid var(--color-neutral-400);padding:4px 9px">
+              <span style="width:7px;height:7px;background:var(--color-accent);flex:none"></span>
+              <span style="font-size:12px">Municipal profile updated on 2026-09-16 by L. Vermeiren, 2 fields corrected</span>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onClick="{{ goQueue }}">Back to worklist</button>
+          <button class="btn btn-primary" onClick="{{ startCall }}">Call this business</button>
+        </div>
+      </div>
+
+      <sc-if value="{{ verified }}" hint-placeholder-val="{{ false }}">
+        <div class="panel" style="border-color:var(--color-accent);margin-bottom:20px;animation:rise .3s ease both">
+          <div style="background:var(--color-accent);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:baseline">
+            <span style="font-weight:600;font-size:14.5px">{{ verifiedTitle }}</span>
+            <span style="font-size:11px;letter-spacing:.06em;text-transform:uppercase">Evidence source voice_agent, 2026-09-16 14:32</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:1px;background:var(--color-neutral-300)">
+            <sc-for list="{{ verifiedFields }}" as="v" hint-placeholder-count="5">
+              <div style="background:#fff;padding:12px 14px">
+                <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+                  <span class="lbl">{{ v.label }}</span>
+                  <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--color-neutral-700)">{{ v.verdict }}</span>
+                </div>
+                <sc-if value="{{ v.changed }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding-top:4px">
+                    <div style="font-size:12.5px;color:var(--color-neutral-600);text-decoration:line-through">{{ v.before }}</div>
+                    <div style="font-size:14.5px;font-weight:600;color:var(--color-accent-700)">{{ v.after }}</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ v.same }}" hint-placeholder-val="{{ true }}">
+                  <div style="padding-top:4px;font-size:14.5px;font-weight:600">{{ v.after }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:14px">
+            <p style="font-size:13px;color:var(--color-neutral-800);margin:0;max-width:86ch;text-wrap:pretty">{{ verifiedNote }}</p>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+              <sc-if value="{{ notApproved }}" hint-placeholder-val="{{ true }}">
+                <button class="btn btn-primary" onClick="{{ approveProposal }}">Approve proposal</button>
+              </sc-if>
+              <sc-if value="{{ approved }}" hint-placeholder-val="{{ false }}">
+                <button class="btn btn-secondary" onClick="{{ goChat }}">Ask the assistant about this street</button>
+              </sc-if>
+              <button class="btn btn-secondary" onClick="{{ reopenCall }}">Replay transcript</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px;align-items:start">
+        <section class="panel">
+          <div class="ph">
+            <span class="lbl">Evidence from connected sources</span>
+            <span style="font-size:11px;color:var(--color-accent-700);font-weight:600">4 of 9 sources disagree</span>
+          </div>
+          <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="9">
+            <div class="row">
+              <div style="width:28px;height:28px;border:1px solid var(--color-neutral-400);display:grid;place-items:center;color:var(--color-accent);flex:none">{{ e.icon }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+                  <span style="font-weight:600;font-size:13.5px">{{ e.source }}</span>
+                  <sc-if value="{{ e.isConflict }}" hint-placeholder-val="{{ true }}">
+                    <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;background:var(--color-accent);color:#fff;padding:2px 6px">{{ e.signal }}</span>
+                  </sc-if>
+                  <sc-if value="{{ e.isPlain }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;border:1px solid var(--color-neutral-400);padding:1px 6px;color:var(--color-neutral-700)">{{ e.signal }}</span>
+                  </sc-if>
+                  <span style="margin-left:auto;font-size:11px;color:var(--color-neutral-600)">{{ e.when }}</span>
+                </div>
+                <div style="font-size:13px;color:var(--color-neutral-800);line-height:1.5;text-wrap:pretty">{{ e.detail }}</div>
+              </div>
+            </div>
+          </sc-for>
+          <p style="font-size:13px;line-height:1.6;margin:0;padding:14px;background:var(--color-neutral-100);text-wrap:pretty"><b>Case summary.</b> Three of nine sources confirm activity, four sources disagree on address, e-mail or opening hours, two sources returned nothing. The registered address is contradicted by two independent sources. Written contact failed: no reply to the verification e-mail after 14 days. A voice check is the cheapest remaining step.</p>
+        </section>
+
+        <aside style="display:flex;flex-direction:column;gap:16px">
+          <div class="panel">
+            <div class="ph"><span class="lbl">Priority score</span></div>
+            <div style="display:flex">
+              <div class="stat" style="flex:1">
+                <div class="lbl">Uncertainty</div>
+                <div class="statn" style="font-size:24px">7</div>
+              </div>
+              <div class="stat" style="flex:1">
+                <div class="lbl">Impact</div>
+                <div class="statn" style="font-size:24px">4</div>
+              </div>
+              <div class="stat" style="flex:1;border-right:0">
+                <div class="lbl" style="color:var(--color-accent-700)">Total</div>
+                <div class="statn" style="font-size:24px;color:var(--color-accent)">28</div>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--color-neutral-700);padding:0 14px 12px">Top 2 percent of the worklist, calculated 2026-09-16.</div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="lbl">Contact attempts</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Verification e-mail</span><span>2026-09-02, no reply</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Reminder e-mail</span><span>2026-09-09, no reply</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Registered phone</span><span>03 417 29 84</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Public e-mail</span><span>{{ dossierEmail }}</span></div>
+            <div class="kv" style="border-bottom:0"><span style="color:var(--color-neutral-700)">Consent basis</span><span>public company data</span></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="lbl">Next step</span></div>
+            <p style="margin:0;padding:12px 14px;font-size:13px;color:var(--color-neutral-800);text-wrap:pretty">The AI voice agent calls the registered number, asks only about public company information, and files whatever it hears as a proposal.</p>
+            <div style="padding:0 14px 14px"><button class="btn btn-primary btn-block" onClick="{{ startCall }}">Call 03 417 29 84</button></div>
+          </div>
+        </aside>
+      </div>
+    </sc-if>
+
+    <!-- 5. AI ASSISTANT -->
+    <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-bottom:16px">
+        <div class="lbl">Assistant</div>
+        <h2 style="margin:2px 0 6px;font-size:24px">Ask the register</h2>
+        <p style="max-width:70ch;margin:0;font-size:13.5px;color:var(--color-neutral-800)">Answers are assembled from the connected sources and the verified case files. Every answer names the sources it used.</p>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 284px;gap:20px;align-items:start">
+        <div class="panel" style="min-height:460px;display:flex;flex-direction:column">
+          <div class="ph"><span class="lbl">Conversation</span><span style="font-size:11px;color:var(--color-neutral-700)">{{ chatMeta }}</span></div>
+
+          <sc-if value="{{ chatEmpty }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:22px 14px">
+              <div class="lbl" style="margin-bottom:10px">Suggested questions</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px">
+                <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+                  <button class="chip" onClick="{{ s.send }}">{{ s.text }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="flex:1">
+            <sc-for list="{{ chatMsgs }}" as="m" hint-placeholder-count="0">
+              <div style="padding:14px;border-bottom:1px solid var(--color-neutral-200);animation:rise .25s ease both">
+                <div class="lbl" style="margin-bottom:6px">{{ m.who }}</div>
+                <div style="font-size:14px;line-height:1.55;text-wrap:pretty">{{ m.text }}</div>
+                <sc-if value="{{ m.hasRows }}" hint-placeholder-val="{{ false }}">
+                  <table style="width:100%;border-collapse:collapse;margin-top:12px;border:1px solid var(--color-neutral-300)">
+                    <thead>
+                      <tr><th>Business</th><th>Address</th><th>Status</th><th>Last verified</th><th>Evidence</th></tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ m.rows }}" as="r" hint-placeholder-count="4">
+                        <tr>
+                          <td style="font-weight:600">{{ r.name }}</td>
+                          <td>{{ r.addr }}</td>
+                          <td>{{ r.status }}</td>
+                          <td style="color:var(--color-neutral-700)">{{ r.when }}</td>
+                          <td style="color:var(--color-neutral-700)">{{ r.src }}</td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                  <div style="font-size:12.5px;color:var(--color-neutral-700);margin-top:10px">{{ m.foot }}</div>
+                </sc-if>
+                <sc-if value="{{ m.hasSources }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+                    <sc-for list="{{ m.sources }}" as="s2" hint-placeholder-count="3">
+                      <span style="font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--color-neutral-400);padding:2px 7px;color:var(--color-neutral-700)">{{ s2.name }}</span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ chatBusy }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:14px;display:flex;align-items:center;gap:10px;color:var(--color-neutral-700);font-size:13px">
+                <span style="width:13px;height:13px;border:1.5px solid var(--color-neutral-400);border-top-color:var(--color-accent);border-radius:50%;animation:spin .8s linear infinite;flex:none"></span>
+                {{ chatStage }}
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--color-neutral-300);background:var(--color-neutral-100)">
+            <input class="input" style="flex:1" placeholder="Ask about a business, a street or a sector" value="{{ chatDraft }}" onChange="{{ onDraft }}">
+            <button class="btn btn-primary" onClick="{{ sendDraft }}">Send</button>
+          </div>
+        </div>
+
+        <aside style="display:flex;flex-direction:column;gap:16px">
+          <div class="panel">
+            <div class="ph"><span class="lbl">Suggested questions</span></div>
+            <sc-for list="{{ suggestions }}" as="s3" hint-placeholder-count="4">
+              <div style="padding:0">
+                <button class="chip" style="border:0;border-bottom:1px solid var(--color-neutral-200);width:100%;background:#fff" onClick="{{ s3.send }}">{{ s3.text }}</button>
+              </div>
+            </sc-for>
+          </div>
+          <div class="panel">
+            <div class="ph"><span class="lbl">Grounding</span></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Businesses indexed</span><b>1 000</b></div>
+            <div class="kv"><span style="color:var(--color-neutral-700)">Verified case files</span><b>{{ checkedCount }}</b></div>
+            <div class="kv" style="border-bottom:0"><span style="color:var(--color-neutral-700)">Connected sources</span><b>{{ connectedCount }}</b></div>
+            <p style="font-size:12.5px;margin:0;padding:12px 14px;border-top:1px solid var(--color-neutral-200);color:var(--color-neutral-700);text-wrap:pretty">The assistant answers only from the register and the evidence rows. It cites them, and it never invents a business.</p>
+          </div>
+        </aside>
+      </div>
+    </sc-if>
+  </main>
+
+  <!-- ADD SOURCE MODAL -->
+  <sc-if value="{{ showSources }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;background:rgba(32,30,29,.55);display:flex;align-items:center;justify-content:center;padding:24px" onClick="{{ closeModal }}">
+      <div class="panel" style="width:min(880px,100%);max-height:88vh;overflow:auto;animation:rise .25s ease both" onClick="{{ stop }}">
+        <div style="padding:16px 18px;border-bottom:1px solid var(--color-neutral-300);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+          <div>
+            <div class="lbl">Step 1 of 2</div>
+            <h3 style="margin:2px 0 4px;font-size:19px">Add data sources</h3>
+            <p style="margin:0;font-size:13px;color:var(--color-neutral-700);max-width:62ch">Pick the sources this municipality is allowed to consult. Credentials are stored per municipality and every query is logged.</p>
+          </div>
+          <button class="btn btn-ghost" onClick="{{ closeModal }}">Close</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:1px;background:var(--color-neutral-300)">
+          <sc-for list="{{ newSources }}" as="n" hint-placeholder-count="5">
+            <div style="background:#fff;padding:14px;display:flex;gap:12px;align-items:flex-start">
+              <div style="width:36px;height:36px;border:1px solid var(--color-neutral-400);display:grid;place-items:center;color:var(--color-accent);flex:none">{{ n.icon }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14px">{{ n.name }}</div>
+                <div style="font-size:12.5px;color:var(--color-neutral-700);line-height:1.45;text-wrap:pretty">{{ n.desc }}</div>
+                <div style="font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-neutral-600);margin-top:6px">{{ n.auth }}</div>
+              </div>
+              <span style="width:16px;height:16px;border:1px solid var(--color-neutral-500);display:grid;place-items:center;flex:none;background:var(--color-neutral-800)"><span style="width:6px;height:6px;background:#fff"></span></span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="padding:14px 18px;border-top:1px solid var(--color-neutral-300);display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;background:var(--color-neutral-100)">
+          <span style="font-size:12.5px;color:var(--color-neutral-700)">5 sources selected. Locatus and Gouden Gids need a municipal licence key, already on file.</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onClick="{{ closeModal }}">Cancel</button>
+            <button class="btn btn-primary" onClick="{{ connectAll }}">Connect 5 sources</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- CALL MODAL -->
+  <sc-if value="{{ showCall }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:70;background:rgba(32,30,29,.62);display:flex;align-items:center;justify-content:center;padding:24px">
+      <div style="width:min(760px,100%);background:#fff;border:1px solid var(--color-neutral-400);animation:rise .25s ease both;display:flex;flex-direction:column;max-height:90vh">
+        <div style="padding:18px;border-bottom:1px solid var(--color-neutral-300);display:flex;gap:16px;align-items:center">
+          <div style="position:relative;width:46px;height:46px;flex:none">
+            <span style="position:absolute;inset:0;border:1px solid var(--color-accent);animation:pls 1.8s ease-out infinite"></span>
+            <div style="position:absolute;inset:0;border:1px solid var(--color-neutral-400);display:grid;place-items:center;color:var(--color-accent);background:#fff">{{ phoneIcon }}</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="lbl">AI voice agent, outbound call</div>
+            <div style="font-family:var(--font-heading);font-weight:700;font-size:19px;line-height:1.2">Demo Uitzendkantoor Schoten</div>
+            <div style="font-size:13px;color:var(--color-neutral-700)">03 417 29 84, Paalstraat 73, 2900 Schoten</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-accent-700);font-weight:600">{{ callStatus }}</div>
+            <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;line-height:1.2">{{ callClock }}</div>
+          </div>
+        </div>
+
+        <div style="padding:12px 18px;border-bottom:1px solid var(--color-neutral-300);display:flex;align-items:center;gap:14px;background:var(--color-neutral-100)">
+          <span class="lbl" style="flex:none">Live audio</span>
+          {{ waveform }}
+          <span style="font-size:11.5px;color:var(--color-neutral-700);flex:none">Dutch, recorded for evidence</span>
+        </div>
+
+        <div style="flex:1;overflow:auto;padding:4px 18px 14px">
+          <sc-if value="{{ ringing }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:26px 0;text-align:center;color:var(--color-neutral-700);font-size:13.5px">
+              Ringing at 03 417 29 84, waiting for someone to pick up
+            </div>
+          </sc-if>
+          <sc-for list="{{ transcript }}" as="t" hint-placeholder-count="0">
+            <div style="padding:12px 0;border-bottom:1px solid var(--color-neutral-200);animation:rise .25s ease both">
+              <div class="lbl" style="margin-bottom:4px">{{ t.who }}</div>
+              <div style="font-size:13.5px;line-height:1.55;text-wrap:pretty">{{ t.text }}</div>
+              <div style="font-size:12px;line-height:1.5;color:var(--color-neutral-600);margin-top:3px;text-wrap:pretty">{{ t.en }}</div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ callTyping }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:12px 0;display:flex;gap:5px;align-items:center">
+              <span style="width:5px;height:5px;background:var(--color-neutral-600);animation:blink 1s infinite"></span>
+              <span style="width:5px;height:5px;background:var(--color-neutral-600);animation:blink 1s .2s infinite"></span>
+              <span style="width:5px;height:5px;background:var(--color-neutral-600);animation:blink 1s .4s infinite"></span>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="padding:14px 18px;border-top:1px solid var(--color-neutral-300);display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--color-neutral-700);max-width:48ch">The agent asks only about public company information and states up front that this is a demonstration.</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary" onClick="{{ muteCall }}">{{ muteLabel }}</button>
+            <button class="btn btn-primary" onClick="{{ hangUp }}">Hang up</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- BACKGROUND CHECK BANNER -->
+  <sc-if value="{{ showCheckToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:50%;bottom:74px;transform:translateX(-50%);z-index:1200;width:min(700px,94vw);background:var(--color-neutral-900);color:#fff;padding:12px 16px;animation:rise .25s ease both">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span style="width:14px;height:14px;border:1.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;flex:none"></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13.5px">Automated check running in the background</div>
+          <div style="font-size:12px;opacity:.8">{{ checkStage }}</div>
+        </div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:18px">{{ checkPctLabel }}</div>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,.22);margin-top:10px">{{ progressBar }}</div>
+    </div>
+  </sc-if>
+
+  <!-- DEMO STEPPER -->
+  <div style="position:fixed;left:0;right:0;bottom:0;z-index:80;background:#fff;border-top:1px solid var(--color-neutral-300);display:flex;align-items:center;gap:14px;padding:8px 16px">
+    <span class="lbl" style="flex:none">Demo script</span>
+    <span style="font-size:13px;font-weight:600;flex:none">{{ stepNo }}</span>
+    <span style="font-size:13px;color:var(--color-neutral-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ stepLabel }}</span>
+    <div style="display:flex;gap:6px;flex:none">
+      <button class="btn btn-secondary" onClick="{{ prevStep }}">Back</button>
+      <button class="btn btn-primary" onClick="{{ nextStep }}">Next</button>
+      <button class="btn btn-ghost" onClick="{{ resetDemo }}">Reset</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const ICONS = {
+  pin: ['M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z', 'circle:12,10,3'],
+  star: ['m12 2 3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z'],
+  book: ['M12 7v14', 'M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'],
+  inbox: ['M22 12h-6l-2 3h-4l-2-3H2', 'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'],
+  store: ['m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7', 'M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4', 'M2 7h20'],
+  globe: ['circle:12,12,10', 'M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20', 'M2 12h20'],
+  landmark: ['M10 18v-7', 'M14 18v-7', 'M18 18v-7', 'M6 18v-7', 'M3 22h18', 'M11.1 2.2a2 2 0 0 1 1.8 0l7.9 3.85c.47.23.3.95-.23.95H3.43c-.53 0-.7-.72-.22-.95L11.1 2.2Z'],
+  phone: ['M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.95.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.86.57 2.81.7A2 2 0 0 1 22 16.92z'],
+  phoneCall: ['M13 2a9 9 0 0 1 9 9', 'M13 6a5 5 0 0 1 5 5', 'M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.2 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.95.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.86.57 2.81.7A2 2 0 0 1 22 16.92z'],
+  mail: ['M22 6 12 13 2 6', 'rect:2,4,20,16'],
+  users: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'circle:9,7,4', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75'],
+  map: ['M14.1 4.1 9.9 2.6a1 1 0 0 0-.7 0L3.6 4.5a1 1 0 0 0-.6.9v13.2a1 1 0 0 0 1.3 1l4.8-1.7a1 1 0 0 1 .7 0l4.2 1.5a1 1 0 0 0 .7 0l5.6-1.9a1 1 0 0 0 .7-.9V3.4a1 1 0 0 0-1.3-1l-4.8 1.7a1 1 0 0 1-.7 0Z', 'M9.5 2.5v16', 'M14.5 5.5v16'],
+  clock: ['circle:12,12,10', 'M12 6v6l4 2'],
+  file: ['M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v5h6'],
+  card: ['rect:2,5,20,14', 'M2 10h20']
+};
+
+function svg(name, size) {
+  const parts = ICONS[name] || ICONS.file;
+  const kids = parts.map((p, i) => {
+    if (p.startsWith('circle:')) {
+      const [cx, cy, r] = p.slice(7).split(',');
+      return React.createElement('circle', { key: i, cx, cy, r });
+    }
+    if (p.startsWith('rect:')) {
+      const [x, y, w, h] = p.slice(5).split(',');
+      return React.createElement('rect', { key: i, x, y, width: w, height: h });
+    }
+    return React.createElement('path', { key: i, d: p });
+  });
+  return React.createElement('svg', {
+    width: size || 18, height: size || 18, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round'
+  }, kids);
+}
+
+const BASE_SOURCES = [
+  { name: 'Locatus Online', icon: 'store', desc: 'Retail and hospitality occupancy per address, surveyed on foot.', kind: 'Licensed feed', meta: 'weekly' },
+  { name: 'Google Maps', icon: 'pin', desc: 'Business status, opening hours and recent review activity.', kind: 'Public API', meta: 'daily' },
+  { name: 'Trustpilot', icon: 'star', desc: 'Customer reviews read for signals of activity or closure.', kind: 'Public API', meta: 'daily' },
+  { name: 'Gouden Gids', icon: 'book', desc: 'Belgian yellow pages listing, phone numbers and trade names.', kind: 'Licensed feed', meta: 'monthly' },
+  { name: 'Outlook inbox', icon: 'inbox', desc: 'Municipal mailboxes searched for mentions of a business.', kind: 'Microsoft 365', meta: 'live' },
+  { name: 'KBO register', icon: 'landmark', desc: 'Federal company register, the baseline record for every case.', kind: 'Reference', meta: 'weekly' },
+  { name: 'OpenStreetMap', icon: 'globe', desc: 'Checks whether the address is mapped as a business at all.', kind: 'Public API', meta: 'daily' },
+  { name: 'AI voice agent', icon: 'phoneCall', desc: 'Calls the registered number and asks about public company data.', kind: 'Outbound', meta: 'on demand' },
+  { name: 'E-mail verification', icon: 'mail', desc: 'Sends a verification request to the registered address.', kind: 'Outbound', meta: 'on demand' }
+];
+
+const EXTRA_SOURCES = [
+  { name: 'Neighbour check', icon: 'users', desc: 'Asks businesses next door to corroborate a finding.', kind: 'Outbound', meta: 'on demand' },
+  { name: 'Address cross-check', icon: 'map', desc: 'Flags a newer business registered at the same address.', kind: 'Derived', meta: 'weekly' },
+  { name: 'VAT activity feed', icon: 'file', desc: 'Declared activity codes and their last change date.', kind: 'Licensed feed', meta: 'monthly' },
+  { name: 'Payment terminal data', icon: 'card', desc: 'Aggregated card activity per postcode, anonymised.', kind: 'Partner', meta: 'monthly' },
+  { name: 'Opening hours crawler', icon: 'clock', desc: 'Reads hours from the business website when one exists.', kind: 'Crawler', meta: 'weekly' }
+];
+
+const NEW_SOURCES = [
+  { name: 'Locatus Online', icon: 'store', desc: 'Retail and hospitality occupancy per address.', auth: 'Municipal licence key on file' },
+  { name: 'Google Maps', icon: 'pin', desc: 'Status, hours and review activity.', auth: 'API key, Schoten project' },
+  { name: 'Trustpilot', icon: 'star', desc: 'Review signals of activity or closure.', auth: 'API key, read only' },
+  { name: 'Gouden Gids', icon: 'book', desc: 'Belgian yellow pages listings and phone numbers.', auth: 'Municipal licence key on file' },
+  { name: 'Outlook inbox', icon: 'inbox', desc: 'Municipal mailboxes, mentions of businesses only.', auth: 'Microsoft 365, delegated consent' }
+];
+
+const QUEUE = [
+  { name: 'Demo Uitzendkantoor Schoten', addr: 'Paalstraat 73', nace: 'Temporary staffing agency', conflicts: 'Address, e-mail, hours', score: 28 },
+  { name: 'FRITUUR F&M', addr: 'Kuipersstraat 73-75', nace: 'Restaurant, limited service', conflicts: 'Hours, phone', score: 21 },
+  { name: 'BM Polish', addr: 'Brechtsebaan 41', nace: 'Not declared', conflicts: 'No listing anywhere', score: 21 },
+  { name: 'Ski High', addr: 'Villerslei 112', nace: 'Not declared', conflicts: 'Closed on 2 sources', score: 14 },
+  { name: 'IMMOZET', addr: 'Churchilllaan 9', nace: 'Not declared', conflicts: 'Address, trade name', score: 14 },
+  { name: 'Het Voetenhuys', addr: 'Alfons Servaislei 22', nace: 'Foot care', conflicts: 'Hours', score: 10 },
+  { name: 'LDM Cleaning', addr: 'Heikantstraat 60', nace: 'Cleaning services', conflicts: 'Phone', score: 7 }
+];
+
+const EVIDENCE = [
+  { source: 'KBO register', icon: 'landmark', signal: 'Baseline', detail: 'Active enterprise, address Paalstraat 73, 2900 Schoten. No change since 2019-03-14.', when: '2026-09-07', conflict: false },
+  { source: 'Locatus Online', icon: 'store', signal: 'Conflict', detail: 'Unit at Paalstraat 73 surveyed as occupied by a different tenant, a hair salon, since spring 2026.', when: '2026-09-12', conflict: true },
+  { source: 'Google Maps', icon: 'pin', signal: 'Conflict', detail: 'Listing found at Brechtsebaan 120, not at the registered address. Reviews posted in the last 30 days.', when: '2026-09-15', conflict: true },
+  { source: 'Gouden Gids', icon: 'book', signal: 'Conflict', detail: 'Listing shows phone 03 417 29 84 and e-mail hallo@demouitzendkantoor.be, which differs from the record.', when: '2026-09-11', conflict: true },
+  { source: 'Outlook inbox', icon: 'inbox', signal: 'Conflict', detail: 'Two mails from staff in June mention the company at Brechtsebaan. No confirmation in writing.', when: '2026-09-14', conflict: true },
+  { source: 'Trustpilot', icon: 'star', signal: 'Active', detail: 'Four reviews in the last 60 days, all describing staffing services. Trading looks ongoing.', when: '2026-09-15', conflict: false },
+  { source: 'OpenStreetMap', icon: 'globe', signal: 'No result', detail: 'No business node at either address. The map has nothing to say here.', when: '2026-09-15', conflict: false },
+  { source: 'E-mail verification', icon: 'mail', signal: 'No result', detail: 'Verification mail sent 2026-09-02 and a reminder 2026-09-09 to info@demo-uitzendkantoor.be. No reply.', when: '2026-09-09', conflict: false },
+  { source: 'Address cross-check', icon: 'map', signal: 'Active', detail: 'No newer enterprise registered at Paalstraat 73, so the company itself is unlikely to be dissolved.', when: '2026-09-15', conflict: false }
+];
+
+const AUDIO_SRC = 'uploads/business-pulse-schoten-45s.mp3';
+const RING_SECONDS = 3;
+
+// Dutch audio, cue = seconds into the recording.
+const TRANSCRIPT = [
+  { who: 'AI voice agent', at: 0, text: 'Hallo, Business Pulse Schoten, fictieve demo. Spreek ik met Demo Uitzendkantoor Schoten?', en: 'Hello, Business Pulse Schoten, fictional demo. Am I speaking with Demo Uitzendkantoor Schoten?' },
+  { who: 'Business', at: 6, text: 'Ja. De naam klopt, maar ons adres is Brechtsebaan 120, 2900 Schoten, niet Paalstraat 73. Ons e-mailadres is hallo@demouitzendkantoor.be.', en: 'Yes. The name is right, but our address is Brechtsebaan 120, not Paalstraat 73. Our e-mail is hallo@demouitzendkantoor.be.' },
+  { who: 'AI voice agent', at: 19, text: 'Bent u actief? Wat zijn activiteit en sector?', en: 'Are you active? What are the activity and the sector?' },
+  { who: 'Business', at: 23, text: 'Ja. Uitzendarbeid en rekrutering, in arbeidsbemiddeling.', en: 'Yes. Temporary staffing and recruitment, in employment services.' },
+  { who: 'AI voice agent', at: 28, text: 'Samenvatting: naam blijft, nieuw adres en e-mailadres zijn bevestigd, en u bent actief. Dit is alleen een voorstel voor het gemeentelijk bedrijfsprofiel; een medewerker keurt het eerst goed.', en: 'Summary: name stays, new address and e-mail confirmed, and you are active. This is only a proposal for the municipal company profile; an officer approves it first.' },
+  { who: 'Business', at: 44, text: 'Ik bevestig.', en: 'I confirm.' }
+];
+
+const VERIFIED_FIELDS = [
+  { label: 'Trade name', verdict: 'Confirmed', changed: false, after: 'Demo Uitzendkantoor Schoten' },
+  { label: 'Public address', verdict: 'Correction proposed', changed: true, before: 'Paalstraat 73, 2900 Schoten', after: 'Brechtsebaan 120, 2900 Schoten' },
+  { label: 'Public e-mail', verdict: 'Correction proposed', changed: true, before: 'info@demo-uitzendkantoor.be', after: 'hallo@demouitzendkantoor.be' },
+  { label: 'Trading status', verdict: 'Confirmed', changed: false, after: 'Active' },
+  { label: 'Activity', verdict: 'Confirmed', changed: false, after: 'Temporary staffing and recruitment' },
+  { label: 'Sector', verdict: 'Confirmed', changed: false, after: 'Human resources and employment services' }
+];
+
+const FRITUUR_ROWS = [
+  { name: 'FRITUUR F&M', addr: 'Kuipersstraat 73-75, 2900 Schoten', status: 'Verified active', when: '2026-09-16', src: 'Locatus, Maps, voice call' },
+  { name: 'Mario & Cindy', addr: 'Paalstraat 78, 2900 Schoten', status: 'Verified active', when: '2026-09-15', src: 'Locatus, Maps, Trustpilot' },
+  { name: 'B&G', addr: 'Paalstraat 152, 2900 Schoten', status: 'Needs a look', when: '2026-09-15', src: 'Maps hours conflict' },
+  { name: 'Van Herck, Sandra', addr: 'Koloniestraat 61, 2900 Schoten', status: 'Status unknown', when: 'never', src: 'KBO only, no listing' }
+];
+
+const STEPS = [
+  { label: 'The map: 443 businesses whose status nobody has checked.' },
+  { label: 'Add data sources: Locatus, Maps, Trustpilot, Gouden Gids, Outlook.' },
+  { label: 'All sources connected, with more available.' },
+  { label: 'Start the automated check, it runs in the background.' },
+  { label: 'One case file with conflicting data, a call is needed.' },
+  { label: 'The AI voice agent calls the business.' },
+  { label: 'What the call verified, filed as a proposal.' },
+  { label: 'Ask the register: all the frituren in this neighbourhood.' }
+];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'map', modal: null, extra: false, connected: true,
+    checkRunning: false, checkPct: 0, checkDone: false,
+    callLines: 0, callSecs: 0, verified: false, ringing: false, muted: false,
+    chatMsgs: [], chatBusy: false, chatDraft: '', step: 1, map: null, approved: false,
+    fQuery: '', fStatus: 'all', fSector: 'all', fStreet: 'all'
+  };
+
+  componentDidMount() {
+    import('./demo-data.js').then(m => {
+      this._data = m.MAP; this._sectors = m.SECTORS || []; this._streets = m.STREETS || [];
+      this.setState({ map: m.MAP }); this.initMap();
+    }).catch(() => {});
+    this._key = e => {
+      if (e.key === 'ArrowRight') this.goStep(this.state.step + 1);
+      if (e.key === 'ArrowLeft') this.goStep(this.state.step - 1);
+    };
+    window.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._key);
+    clearInterval(this._chk); clearTimeout(this._chat); clearTimeout(this._leaflet);
+    this.stopAudio();
+    if (this._map) { this._map.remove(); this._map = null; this._mapInit = false; }
+  }
+
+  // ── map (Leaflet + OpenStreetMap) ──
+  setMapRef = el => {
+    if (!el) {
+      // leaving the Map screen: tear the map down so the next mount rebuilds it
+      clearTimeout(this._leaflet);
+      if (this._map) { try { this._map.remove(); } catch (e) {} }
+      this._map = null; this._mapEl = null; this._mapInit = false;
+      this._markers = null; this._painted = 0;
+      return;
+    }
+    this._mapEl = el;
+    this.initMap();
+  };
+
+  initMap = () => {
+    if (this._mapInit || !this._mapEl || !this._data) return;
+    if (!window.L) { clearTimeout(this._leaflet); this._leaflet = setTimeout(this.initMap, 150); return; }
+    const L = window.L, d = this._data, b = d.box;
+    this._mapInit = true;
+    const map = L.map(this._mapEl, { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+    map.fitBounds([[b.lat0, b.lon0], [b.lat1, b.lon1]]);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    this._map = map;
+    this._markers = d.points.map(p => {
+      const lat = b.lat1 - (p.y / 100) * (b.lat1 - b.lat0);
+      const lon = b.lon0 + (p.x / 100) * (b.lon1 - b.lon0);
+      const mk = L.circleMarker([lat, lon], {
+        radius: 4, color: '#98989b', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1
+      }).addTo(map);
+      mk.bindTooltip(p.n + ', ' + p.a + ' — status unknown', { direction: 'top' });
+      mk._pt = p;
+      return mk;
+    });
+    this._painted = 0;
+    // the case file business
+    const paal = d.streets.find(s => s.name === 'Paalstraat') || { x: 50, y: 50 };
+    const plat = b.lat1 - (paal.y / 100) * (b.lat1 - b.lat0);
+    const plon = b.lon0 + (paal.x / 100) * (b.lon1 - b.lon0);
+    L.circleMarker([plat, plon], { radius: 9, color: '#ec3013', weight: 2, fillColor: '#ec3013', fillOpacity: 0.35 })
+      .addTo(map)
+      .bindTooltip('Demo Uitzendkantoor Schoten, Paalstraat 73', { direction: 'top', permanent: false });
+    this.paintMarkers();
+    setTimeout(() => { if (this._map) this._map.invalidateSize(); }, 60);
+  };
+
+  paintMarkers = () => {
+    if (!this._markers) return;
+    const STYLE = {
+      high: { radius: 5, color: '#ec3013', weight: 1, fillColor: '#ec3013', fillOpacity: 0.95 },
+      medium: { radius: 4.5, color: '#f2765d', weight: 1, fillColor: '#f2765d', fillOpacity: 0.95 },
+      low: { radius: 4, color: '#424244', weight: 1, fillColor: '#424244', fillOpacity: 0.95 }
+    };
+    const LABEL = { high: 'conflicting data, high priority', medium: 'needs a look, medium', low: 'verified active' };
+    const n = Math.floor(this._markers.length * (this.state.checkPct / 100));
+    for (let i = this._painted; i < n; i++) {
+      const mk = this._markers[i], st = mk._pt.s === 'unknown' ? 'low' : mk._pt.s;
+      mk.setStyle(STYLE[st]);
+      mk.setTooltipContent(mk._pt.n + ', ' + mk._pt.a + ' — ' + LABEL[st]);
+    }
+    this._painted = Math.max(this._painted, n);
+  };
+
+  // ── check: starts, then keeps running in the background ──
+  startCheck = () => {
+    if (this.state.checkRunning) return;
+    clearInterval(this._chk);
+    this.setState({ modal: null, checkRunning: true, checkPct: 0 });
+    this._chk = setInterval(() => {
+      const p = Math.min(this.state.checkPct + 0.42, 94);
+      this.setState({ checkPct: p });
+      this.paintMarkers();
+    }, 700);
+  };
+
+  // ── call ──
+  stopAudio = () => {
+    clearInterval(this._call); clearInterval(this._clock); clearTimeout(this._ring);
+    if (this._audio) { try { this._audio.pause(); this._audio.currentTime = 0; } catch (e) {} }
+  };
+
+  startCall = () => {
+    this.stopAudio();
+    if (!this._audio) { this._audio = new Audio(AUDIO_SRC); this._audio.preload = 'auto'; }
+    this._audio.muted = false;
+    this.setState({ screen: 'dossier', modal: 'call', callLines: 0, callSecs: 0, ringing: true, muted: false });
+    this._clock = setInterval(() => this.setState({ callSecs: this.state.callSecs + 1 }), 1000);
+    // 3 seconds of ringing before anyone picks up
+    this._ring = setTimeout(() => {
+      this.setState({ ringing: false });
+      const a = this._audio;
+      if (a) { try { a.currentTime = 0; a.play().catch(() => {}); } catch (e) {} }
+      this._call = setInterval(() => {
+        const t = this._audio ? this._audio.currentTime : 0;
+        let n = 0;
+        for (let i = 0; i < TRANSCRIPT.length; i++) if (t + 0.25 >= TRANSCRIPT[i].at) n = i + 1;
+        if (n !== this.state.callLines) this.setState({ callLines: n });
+        if (this._audio && this._audio.ended) clearInterval(this._call);
+      }, 200);
+    }, RING_SECONDS * 1000);
+  };
+  hangUp = () => {
+    this.stopAudio();
+    this.setState({ modal: null, verified: true, screen: 'dossier', ringing: false });
+  };
+  muteCall = () => {
+    const m = !this.state.muted;
+    if (this._audio) this._audio.muted = m;
+    this.setState({ muted: m });
+  };
+  reopenCall = () => this.startCall();
+
+  approveProposal = () => this.setState({ approved: true, screen: 'dossier', modal: null });
+
+  filtered = () => {
+    const s = this.state, d = this.state.map;
+    if (!d) return [];
+    const q = (s.fQuery || '').trim().toLowerCase();
+    return d.points.filter(p => {
+      if (s.fStatus !== 'all' && p.s !== s.fStatus) return false;
+      if (s.fSector !== 'all' && p.sec !== s.fSector) return false;
+      if (s.fStreet !== 'all' && p.st !== s.fStreet) return false;
+      if (q && !(p.n + ' ' + p.a + ' ' + p.sec).toLowerCase().includes(q)) return false;
+      return true;
+    });
+  };
+
+  // ── chat ──
+  send = text => {
+    clearTimeout(this._chat);
+    const msgs = this.state.chatMsgs.concat([{ who: 'Officer', text }]);
+    this.setState({ screen: 'chat', chatMsgs: msgs, chatBusy: true, chatDraft: '' });
+    this._chat = setTimeout(() => {
+      const isFrituur = /frituur|frituren|fries|friet|chip shop/i.test(text);
+      const reply = isFrituur
+        ? {
+            who: 'Business Pulse',
+            text: 'Four businesses in the Schoten centre are registered under NACE 56112, restaurants with limited service, which is the code frituren fall under. Two are verified active, one needs a look because its opening hours conflict across sources, and one has never been checked outside the register.',
+            rows: FRITUUR_ROWS,
+            foot: 'Neighbourhood taken as the 3.4 km² centre view. Register snapshot 2026-09-07, evidence rows up to 2026-09-16.',
+            sources: ['KBO register', 'Locatus Online', 'Google Maps', 'Trustpilot', 'AI voice agent']
+          }
+        : {
+            who: 'Business Pulse',
+            text: 'I answer from the register and the evidence rows only. Try one of the suggested questions on the right, or name a street, a sector or a business.',
+            sources: ['KBO register']
+          };
+      this.setState({ chatBusy: false, chatMsgs: this.state.chatMsgs.concat([reply]) });
+    }, 1900);
+  };
+
+  // ── steps ──
+  goStep = n => {
+    if (n < 1 || n > STEPS.length) return;
+    this.stopAudio(); clearTimeout(this._chat);
+    const base = { step: n, modal: null, chatBusy: false };
+    if (n === 1) {
+      clearInterval(this._chk);
+      this._painted = 0;
+      if (this._markers) this._markers.forEach(mk => {
+        mk.setStyle({ radius: 4, color: '#98989b', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1 });
+        mk.setTooltipContent(mk._pt.n + ', ' + mk._pt.a + ' — status unknown');
+      });
+      this.setState({ ...base, screen: 'map', checkRunning: false, checkPct: 0, verified: false, approved: false, chatMsgs: [], fQuery: '', fStatus: 'all', fSector: 'all', fStreet: 'all' });
+    }
+    if (n === 2) this.setState({ ...base, screen: 'sources', modal: 'sources', extra: false });
+    if (n === 3) this.setState({ ...base, screen: 'sources', extra: true });
+    if (n === 4) { this.setState({ ...base, screen: 'map' }); this.startCheck(); }
+    if (n === 5) this.setState({ ...base, screen: 'dossier', verified: false });
+    if (n === 6) { this.setState({ ...base, screen: 'dossier' }); this.startCall(); }
+    if (n === 7) this.setState({ ...base, screen: 'dossier', verified: true });
+    if (n === 8) { this.setState({ ...base, screen: 'chat', verified: true, chatMsgs: [] }); setTimeout(() => this.send('Show me all the frituur in this neighbourhood'), 350); }
+  };
+
+  renderVals() {
+    const s = this.state;
+    const pct = Math.round(s.checkPct);
+    const frac = s.checkPct / 100;
+    const conns = BASE_SOURCES.concat(s.extra ? EXTRA_SOURCES : []).map(c => ({
+      ...c, icon: svg(c.icon, 18), connected: true, pending: false
+    }));
+
+    const tr = TRANSCRIPT.slice(0, s.callLines);
+    const mm = String(Math.floor(s.callSecs / 60)).padStart(2, '0');
+    const ss = String(s.callSecs % 60).padStart(2, '0');
+    const stage = s.ringing ? 'Ringing' : (s.callLines >= TRANSCRIPT.length ? 'Wrapping up' : 'Connected');
+
+    const bars = Array.from({ length: 28 }, (_, i) => React.createElement('span', {
+      key: i,
+      style: { flex: 1, height: '20px', background: 'var(--color-accent)', opacity: 0.25 + (i % 5) * 0.15, transformOrigin: 'center', animation: 'wv ' + (0.5 + (i % 7) * 0.09).toFixed(2) + 's ease-in-out ' + (i * 0.04).toFixed(2) + 's infinite' }
+    }));
+
+    return {
+      isMap: s.screen === 'map', isSources: s.screen === 'sources', isQueue: s.screen === 'queue',
+      isDossier: s.screen === 'dossier', isChat: s.screen === 'chat', isAll: s.screen === 'all',
+      navAll: s.screen === 'all' ? 'on' : '',
+      goAll: () => this.setState({ screen: 'all', modal: null }),
+      showCheckToast: s.checkRunning && s.screen === 'map',
+      approved: s.approved, notApproved: !s.approved,
+      approveProposal: this.approveProposal,
+      dossierAddress: s.approved ? 'Brechtsebaan 120, 2900 Schoten' : 'Paalstraat 73, 2900 Schoten',
+      dossierEmail: s.approved ? 'hallo@demouitzendkantoor.be' : 'info@demo-uitzendkantoor.be',
+      verifiedTitle: s.approved
+        ? 'Proposal approved: 2 fields corrected in the municipal company profile'
+        : 'Voice check completed: 4 fields confirmed, 2 corrections proposed',
+      verifiedNote: s.approved
+        ? 'Approved on 2026-09-16 at 14:35 by L. Vermeiren. The municipal company profile now carries the new address and e-mail, with the call recording as evidence. The federal KBO record is untouched; a change request can be filed separately.'
+        : 'This is not an automatic KBO update and nothing is published. The result is filed as a proposal for the municipal company profile, and a Schoten officer reviews it first. Transcript and call audio are attached to the evidence row.',
+      navMap: s.screen === 'map' ? 'on' : '', navSources: s.screen === 'sources' ? 'on' : '',
+      navQueue: s.screen === 'queue' ? 'on' : '', navDossier: s.screen === 'dossier' ? 'on' : '',
+      navChat: s.screen === 'chat' ? 'on' : '',
+      goMap: () => this.setState({ screen: 'map', modal: null }),
+      goSources: () => this.setState({ screen: 'sources', modal: null }),
+      goQueue: () => this.setState({ screen: 'queue', modal: null }),
+      goDossier: () => this.setState({ screen: 'dossier', modal: null }),
+      goChat: () => this.setState({ screen: 'chat', modal: null }),
+
+      unknownCount: (443 - Math.floor(443 * frac)).toLocaleString('en-GB'),
+      connectedCount: s.extra ? 14 : 9,
+      checkedCount: Math.floor(759 * frac),
+      evidenceCount: Math.floor(6831 * frac).toLocaleString('en-GB'),
+      mapRef: this.setMapRef,
+      checkBtnLabel: s.checkRunning ? 'Check running in background' : 'Start automated check',
+
+      connectors: conns,
+      loadMoreLabel: s.extra ? 'All connectors shown' : 'Load 5 more connectors',
+      loadMore: () => this.setState({ extra: true }),
+      connectorSummary: s.extra ? '14 of 14 connectors connected for Schoten.' : '9 connected. 5 more available for this municipality.',
+      openSourcesModal: () => this.setState({ screen: 'sources', modal: 'sources' }),
+      closeModal: () => this.setState({ modal: null }),
+      connectAll: () => this.setState({ modal: null, extra: false, screen: 'sources' }),
+      stop: e => e.stopPropagation(),
+      showSources: s.modal === 'sources',
+      newSources: NEW_SOURCES.map(n => ({ ...n, icon: svg(n.icon, 20) })),
+
+      queue: QUEUE.map(q => q.name === 'Demo Uitzendkantoor Schoten' && s.approved
+        ? { ...q, conflicts: 'Resolved by voice call', score: 0 } : q),
+      evidence: (s.verified
+        ? [{
+            source: 'AI voice agent', icon: 'phoneCall', signal: s.approved ? 'Applied' : 'Confirmed',
+            detail: 'Call answered on 2026-09-16 at 14:32, 47 seconds. Address and e-mail corrected by an authorised person, activity and sector confirmed, company active. Recording and transcript attached.',
+            when: '2026-09-16', conflict: false
+          }].concat(EVIDENCE)
+        : EVIDENCE
+      ).map(e => ({ ...e, icon: svg(e.icon, 15), isConflict: e.conflict, isPlain: !e.conflict })),
+      verified: s.verified,
+      verifiedFields: VERIFIED_FIELDS.map(v => ({
+        ...v, same: !v.changed,
+        verdict: s.approved ? (v.changed ? 'Applied' : 'Confirmed') : v.verdict
+      })),
+
+      startCheck: this.startCheck,
+      checkRunning: s.checkRunning,
+      checkPctLabel: pct + '%',
+      checkStage: (pct < 12 ? 'Querying Locatus Online and Gouden Gids' : pct < 28 ? 'Reading Google Maps listings and hours' : pct < 45 ? 'Reading Trustpilot review activity' : pct < 62 ? 'Searching the municipal Outlook inbox' : pct < 80 ? 'Cross-checking addresses in the register' : 'Scoring uncertainty and impact') + ', ' + Math.floor(759 * frac) + ' of 759 businesses done',
+      progressBar: React.createElement('div', { style: { width: pct + '%', height: '100%', background: '#fff', transition: 'width .12s linear' } }),
+
+      startCall: this.startCall, hangUp: this.hangUp, muteCall: this.muteCall, reopenCall: this.reopenCall,
+      showCall: s.modal === 'call',
+      callStatus: stage, callClock: mm + ':' + ss,
+      callTyping: !s.ringing && s.callLines < TRANSCRIPT.length,
+      ringing: s.ringing,
+      muteLabel: s.muted ? 'Unmute' : 'Mute',
+      transcript: tr,
+      phoneIcon: svg('phone', 20),
+      waveform: React.createElement('div', { style: { flex: 1, display: 'flex', alignItems: 'center', gap: '2px', height: '22px' } }, bars),
+
+      chatMsgs: s.chatMsgs.map((m, i) => ({
+        who: m.who, text: m.text, hasRows: !!m.rows, rows: m.rows || [], foot: m.foot || '',
+        hasSources: !!m.sources, sources: (m.sources || []).map(n => ({ name: n })), key: i
+      })),
+      chatEmpty: s.chatMsgs.length === 0 && !s.chatBusy,
+      chatBusy: s.chatBusy,
+      chatStage: 'Searching the register, reading evidence rows',
+      chatMeta: s.chatMsgs.length ? s.chatMsgs.length + ' messages' : 'New conversation',
+      chatDraft: s.chatDraft,
+      onDraft: e => this.setState({ chatDraft: e.target.value }),
+      sendDraft: () => { const t = (s.chatDraft || '').trim(); if (t) this.send(t); },
+      suggestions: [
+        'Show me all the frituur in this neighbourhood',
+        'Which businesses were confirmed active this week?',
+        'Where do Locatus and the register disagree?',
+        'What does Demo Uitzendkantoor Schoten do?'
+      ].map(t => ({ text: t, send: () => this.send(t) })),
+
+      fQuery: s.fQuery, fStatus: s.fStatus, fSector: s.fSector, fStreet: s.fStreet,
+      onQuery: e => this.setState({ fQuery: e.target.value }),
+      onStatus: e => this.setState({ fStatus: e.target.value }),
+      onSector: e => this.setState({ fSector: e.target.value }),
+      onStreet: e => this.setState({ fStreet: e.target.value }),
+      resetFilters: () => this.setState({ fQuery: '', fStatus: 'all', fSector: 'all', fStreet: 'all' }),
+      sectorOptions: (this._sectors || []).map(n => ({ name: n })),
+      streetOptions: (this._streets || []).map(n => ({ name: n })),
+      resultCount: (() => { const f = this.filtered(); return f.length + (f.length === 1 ? ' business' : ' businesses'); })(),
+      resultBreakdown: (() => {
+        const f = this.filtered(), lim = Math.floor(f.length * frac);
+        const c = { unknown: 0, high: 0, medium: 0, low: 0 };
+        f.forEach((p, i) => { c[i < lim ? p.s : 'unknown']++; });
+        return c.unknown + ' unknown, ' + c.high + ' conflicting, ' + c.medium + ' to look at, ' + c.low + ' verified active';
+      })(),
+      allRows: (() => {
+        const f = this.filtered(), lim = Math.floor(f.length * frac);
+        const LAB = { unknown: 'Status unknown', high: 'Conflicting data', medium: 'Needs a look', low: 'Verified active' };
+        return f.slice(0, 60).map((p, i) => {
+          const st = i < lim ? p.s : 'unknown';
+          return {
+            name: p.n, addr: p.a + ', 2900 Schoten', sector: p.sec, nr: p.nr,
+            status: LAB[st], cls: 'st-' + st,
+            when: i < lim ? '2026-09-16' : 'never checked',
+            open: () => {}
+          };
+        });
+      })(),
+      tableFoot: (() => { const n = this.filtered().length; return n > 60 ? 'Showing the first 60 of ' + n + ' matching records. Narrow the filters to see the rest.' : 'Showing all ' + n + ' matching records.'; })(),
+
+      stepNo: s.step + ' / ' + STEPS.length,
+      stepLabel: STEPS[s.step - 1].label,
+      nextStep: () => this.goStep(s.step + 1),
+      prevStep: () => this.goStep(s.step - 1),
+      resetDemo: () => this.goStep(1)
+    };
+  }
+}
+</script>
+</body>
+</html>
