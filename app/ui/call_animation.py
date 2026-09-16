@@ -28,6 +28,7 @@ import streamlit as st
 
 from app import scoring
 from app.sources import voice_stub
+from app.ui import theme
 
 # The connected stage lasts this long before it ends on its own if the
 # officer never clicks "Hang up". Single, clearly-named knob so this is
@@ -93,26 +94,42 @@ _RESULT_LABEL_KEYS = {
 
 # One shared pulse dot style for both the dialing (single dot) and
 # connected (two dots) stages. Rendered as plain HTML/CSS so the pulse
-# keeps animating in the browser between Python reruns.
-_PULSE_STYLE = """
+# keeps animating in the browser between Python reruns. Uses the shared
+# theme's accent color instead of a one-off blue, so the call modal reads as
+# part of the same Business Pulse look as the rest of the app.
+_PULSE_STYLE = f"""
 <style>
-.pav-call-dot {
+.pav-call-dot {{
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background-color: #1565c0;
+    background-color: {theme.COLOR_ACCENT};
     display: inline-block;
     margin: 0 9px;
     animation: pav-call-pulse 1.2s ease-in-out infinite;
-}
-.pav-call-dot--b {
+}}
+.pav-call-dot--b {{
     animation-delay: 0.35s;
-}
-@keyframes pav-call-pulse {
-    0% { transform: scale(0.85); opacity: 0.65; box-shadow: 0 0 0 0 rgba(21, 101, 192, 0.45); }
-    50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 10px rgba(21, 101, 192, 0); }
-    100% { transform: scale(0.85); opacity: 0.65; box-shadow: 0 0 0 0 rgba(21, 101, 192, 0); }
-}
+}}
+@keyframes pav-call-pulse {{
+    0% {{ transform: scale(0.85); opacity: 0.65; box-shadow: 0 0 0 0 rgba(236, 48, 19, 0.45); }}
+    50% {{ transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 10px rgba(236, 48, 19, 0); }}
+    100% {{ transform: scale(0.85); opacity: 0.65; box-shadow: 0 0 0 0 rgba(236, 48, 19, 0); }}
+}}
+</style>
+"""
+
+# Dialog chrome: sharp corners and a hairline border on the modal panel
+# itself, matching the theme's "no rounded containers" rule (see
+# app/ui/theme.py's _STYLE_BLOCK) -- best-effort selector since Streamlit
+# does not expose a documented class name for the dialog panel, only the
+# "stDialog" testid on its outer wrapper.
+_DIALOG_CHROME_STYLE = f"""
+<style>
+[data-testid="stDialog"] > div {{
+    border-radius: 0 !important;
+    border: 1px solid {theme.COLOR_NEUTRAL_300} !important;
+}}
 </style>
 """
 
@@ -201,11 +218,12 @@ def _render_ended_stage(business: dict, db_path: str, lang: str) -> None:
     color = _RESULT_COLORS.get(signal, "#757575")
     result_label = _s(_RESULT_LABEL_KEYS.get(signal, "result_silent"), lang)
 
-    st.markdown(f"**{_s('ended_heading', lang)}**")
+    st.markdown(theme.panel_header(_s("ended_heading", lang)), unsafe_allow_html=True)
     st.markdown(
         f"""
-        <div style="border-left: 4px solid {color}; padding: 10px 14px; margin: 10px 0;
-                    background-color: rgba(127,127,127,0.08); border-radius: 4px;">
+        <div style="border-left: 4px solid {color}; border-top: 1px solid {theme.COLOR_NEUTRAL_300};
+                    border-right: 1px solid {theme.COLOR_NEUTRAL_300}; border-bottom: 1px solid {theme.COLOR_NEUTRAL_300};
+                    padding: 10px 14px; margin: 10px 0; background-color: {theme.COLOR_NEUTRAL_100};">
             <span style="color:{color}; font-weight:700;">{result_label}</span><br/>
             <span style="font-size:0.92em;">{_s('detail_label', lang)}: {detail}</span>
         </div>
@@ -291,6 +309,7 @@ def open_call_dialog(business: dict, db_path: str, lang: str) -> None:
 
     @st.dialog(title)
     def _call_dialog() -> None:
+        st.markdown(_DIALOG_CHROME_STYLE, unsafe_allow_html=True)
         stage = st.session_state.get(_STAGE_KEY, "dialing")
 
         if stage == "dialing":
