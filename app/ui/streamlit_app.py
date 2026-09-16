@@ -43,6 +43,8 @@ from app import scoring, seasonal  # noqa: E402
 from app.db import get_connection  # noqa: E402
 from app.ingest import get_business, list_businesses  # noqa: E402
 from app.ui import freshness_view  # noqa: E402
+from app.ui.call_animation import render_call_simulation  # noqa: E402
+from app.ui.history_view import render_history  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
@@ -95,10 +97,6 @@ TRANSLATIONS = {
         "status_pending": "Nog te controleren",
         "status_confirmed_active": "Bevestigd: actief",
         "status_confirmed_inactive": "Bevestigd: inactief",
-        "signal_active": "actief",
-        "signal_inactive": "inactief",
-        "signal_disagreement": "tegenstrijdig",
-        "signal_silent": "geen resultaat",
         "unknown": "onbekend",
         "map_legend_high": "Hoge prioriteit",
         "map_legend_medium": "Gemiddelde prioriteit",
@@ -190,6 +188,8 @@ TRANSLATIONS = {
         "dossier_run_verification_button": "Voer verificatie uit",
         "dossier_verification_spinner": "Bronnen worden geraadpleegd...",
         "dossier_verification_success": "Verificatie voltooid.",
+        "dossier_call_simulation_button": "Simuleer telefoongesprek",
+        "dossier_call_simulation_success": "Gesprek afgerond en gelogd als bewijs.",
         "dossier_case_file_header": "Case-dossier",
         "dossier_internal_debug_caption": "(interne detail, EN: {reason})",
         "dossier_score_header": "Prioriteitsscore",
@@ -198,8 +198,6 @@ TRANSLATIONS = {
         "dossier_metric_priority_total": "Prioriteit (totaal)",
         "dossier_last_calculated_caption": "Laatst berekend: {date}",
         "dossier_no_score_info": "Nog geen score berekend. Voer eerst een verificatie uit.",
-        "dossier_evidence_header": "Bewijs per bron",
-        "dossier_no_evidence_info": "Nog geen bewijs verzameld voor dit bedrijf.",
         "dossier_review_header": "Beoordeling",
         "dossier_note_input_label": "Notitie (optioneel)",
         "dossier_confirm_active_button": "Bevestigen: actief",
@@ -238,10 +236,6 @@ TRANSLATIONS = {
         "status_pending": "Not yet checked",
         "status_confirmed_active": "Confirmed: active",
         "status_confirmed_inactive": "Confirmed: inactive",
-        "signal_active": "active",
-        "signal_inactive": "inactive",
-        "signal_disagreement": "conflicting",
-        "signal_silent": "no result",
         "unknown": "unknown",
         "map_legend_high": "High priority",
         "map_legend_medium": "Medium priority",
@@ -331,6 +325,8 @@ TRANSLATIONS = {
         "dossier_run_verification_button": "Run verification",
         "dossier_verification_spinner": "Consulting sources...",
         "dossier_verification_success": "Verification completed.",
+        "dossier_call_simulation_button": "Simulate phone call",
+        "dossier_call_simulation_success": "Call completed and logged as evidence.",
         "dossier_case_file_header": "Case file",
         "dossier_internal_debug_caption": "(internal detail, EN: {reason})",
         "dossier_score_header": "Priority score",
@@ -339,8 +335,6 @@ TRANSLATIONS = {
         "dossier_metric_priority_total": "Priority (total)",
         "dossier_last_calculated_caption": "Last calculated: {date}",
         "dossier_no_score_info": "No score calculated yet. Run a verification first.",
-        "dossier_evidence_header": "Evidence by source",
-        "dossier_no_evidence_info": "No evidence collected yet for this business.",
         "dossier_review_header": "Review",
         "dossier_note_input_label": "Note (optional)",
         "dossier_confirm_active_button": "Confirm: active",
@@ -393,15 +387,6 @@ def status_labels(lang: str) -> dict:
     }
 
 
-def signal_labels(lang: str) -> dict:
-    return {
-        "active": t("signal_active", lang),
-        "inactive": t("signal_inactive", lang),
-        "disagreement": t("signal_disagreement", lang),
-        "silent": t("signal_silent", lang),
-    }
-
-
 def map_legend_labels(lang: str) -> dict:
     return {
         "high": t("map_legend_high", lang),
@@ -417,13 +402,6 @@ def entity_type_labels(lang: str) -> dict:
         "establishment": t("entity_type_establishment", lang),
     }
 
-
-SIGNAL_COLORS = {
-    "active": "#2e7d32",       # green
-    "inactive": "#c62828",     # red
-    "disagreement": "#ef6c00",  # orange
-    "silent": "#757575",       # grey
-}
 
 # Best-effort OSM discovery demo settings (view 3).
 DISCOVERY_RADIUS_METERS = 300
@@ -858,31 +836,6 @@ def generate_case_file_text(business: dict, evidence_rows: list, dampener: dict,
     return text
 
 
-def render_evidence_row(e: dict, lang: str) -> None:
-    signal = e.get("signal") or "silent"
-    color = SIGNAL_COLORS.get(signal, "#757575")
-    label = signal_labels(lang).get(signal, t("unknown", lang))
-    # source/detail/created are untrusted free text (mock data today, real
-    # scraped/API text once the live adapters are enabled) interpolated into
-    # unsafe_allow_html=True markdown -- escape to prevent HTML/script
-    # injection. color/label come from fixed whitelists above, safe as-is.
-    source = html.escape(str(e.get("source") or t("unknown", lang)))
-    detail = html.escape(str(e.get("detail") or ""))
-    created = html.escape(format_date(e.get("created_at"), lang))
-    st.markdown(
-        f"""
-        <div style="border-left: 4px solid {color}; padding: 6px 10px; margin-bottom: 6px;
-                    background-color: rgba(127,127,127,0.08); border-radius: 4px;">
-            <b>{source}</b> &mdash;
-            <span style="color:{color}; font-weight:600;">{label}</span>
-            <span style="float:right; color:#888; font-size:0.85em;">{created}</span><br/>
-            <span style="font-size:0.9em;">{detail}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 # --------------------------------------------------------------------------
 # View 1 -- Dashboard (read-only monitoring: is the automatic system working)
 # --------------------------------------------------------------------------
@@ -1107,6 +1060,13 @@ def view_dossier(db_path: str, lang: str) -> None:
         st.success(t("dossier_verification_success", lang))
         st.rerun()
 
+    if st.button(t("dossier_call_simulation_button", lang)):
+        render_call_simulation(business, db_path, lang)
+        scoring.compute_score(uidn, db_path)
+        st.cache_data.clear()
+        st.success(t("dossier_call_simulation_success", lang))
+        st.rerun()
+
     evidence_rows = get_evidence(uidn, db_path)
     score = get_score(uidn, db_path)
     dampener = seasonal.seasonal_dampener(business, evidence_rows, date.today().month)
@@ -1138,12 +1098,7 @@ def view_dossier(db_path: str, lang: str) -> None:
         st.info(t("dossier_no_score_info", lang))
 
     st.divider()
-    st.subheader(t("dossier_evidence_header", lang))
-    if not evidence_rows:
-        st.info(t("dossier_no_evidence_info", lang))
-    else:
-        for e in evidence_rows:
-            render_evidence_row(e, lang)
+    render_history(business, evidence_rows, lang, db_path)
 
     st.divider()
     st.subheader(t("dossier_review_header", lang))
