@@ -22,10 +22,10 @@ def render(db_path: str = None) -> None:
 
     st.header(f"Wat is er veranderd sinds {diff['baseline_date']}?")
     st.caption(
-        "Ter demonstratie: dit scherm simuleert een eerdere momentopname, aangezien er "
-        "nog maar één echte data-snapshot beschikbaar is. De 'huidige' gegevens zijn "
-        "echt; de situatie op de eerdere datum is kunstmatig gesimuleerd om het concept "
-        "van veranderingsdetectie te tonen."
+        "Deze weergave schat een eerdere momentopname, aangezien er nog maar één "
+        "werkelijke gegevensopname beschikbaar is. De 'huidige' gegevens zijn echt; "
+        "de situatie op de eerdere datum is geschat om het concept van "
+        "veranderingsdetectie te tonen."
     )
 
     new_businesses = diff.get("new_businesses") or []

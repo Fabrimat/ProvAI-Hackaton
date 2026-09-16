@@ -45,6 +45,7 @@ from app.ingest import get_business, list_businesses  # noqa: E402
 from app.sources import address_crosscheck  # noqa: E402
 from app.ui import call_animation, freshness_view, search_animation  # noqa: E402
 from app.ui.history_view import render_history  # noqa: E402
+from app.ui import ai_search_chat, data_sources_view  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
@@ -231,9 +232,9 @@ TRANSLATIONS = {
             "KBO-register staan, nog in ontwikkeling."
         ),
         "discovery_caption": (
-            "Onderstaande demonstratie haalt een beperkt aantal echte OSM-punten op rond het "
+            "Onderstaande weergave haalt een beperkt aantal echte OSM-punten op rond het "
             "centrum van Schoten en toont welke namen niet overeenkomen met een bedrijf in het "
-            "register. Dit is een best-effort demonstratie, geen volledige implementatie."
+            "register. Dit is een best-effort steekproef, geen volledige implementatie."
         ),
         "discovery_run_button": "Voer OSM-steekproef uit rond centrum Schoten",
         "discovery_spinner": "OpenStreetMap wordt geraadpleegd...",
@@ -383,9 +384,9 @@ TRANSLATIONS = {
             "KBO register, still under development."
         ),
         "discovery_caption": (
-            "The demonstration below fetches a limited number of real OSM points around "
+            "The view below fetches a limited number of real OSM points around "
             "the center of Schoten and shows which names do not match a business in the "
-            "register. This is a best-effort demonstration, not a full implementation."
+            "register. This is a best-effort sample, not a full implementation."
         ),
         "discovery_run_button": "Run OSM sample around Schoten center",
         "discovery_spinner": "Consulting OpenStreetMap...",
@@ -1777,6 +1778,10 @@ def main() -> None:
         view_to_verify(DB_PATH, lang)
     elif nav == "Dossier":
         view_dossier(DB_PATH, lang)
+    elif nav == "Zoeken":
+        ai_search_chat.render(DB_PATH, lang)
+    elif nav == "Databronnen":
+        data_sources_view.render(DB_PATH, lang)
     elif nav == "Ontdekkingslijst":
         view_discovery_queue(DB_PATH, lang)
     else:

@@ -23,11 +23,9 @@ _HISTORY_STRINGS = {
     "nl": {
         "header": "Verificatiegeschiedenis",
         "disclosure": (
-            "Let op: het oudere deel van deze tijdlijn is een gesimuleerde "
-            "demonstratie, geen echte historische controles. Er is momenteel "
-            "maar een echte data-momentopname beschikbaar."
+            "Let op: het oudere deel van deze tijdlijn is een schatting op basis van "
+            "beschikbare gegevens, geen vastgelegde historische controles."
         ),
-        "simulated_tag": "gesimuleerd",
         "unknown_source": "onbekende bron",
         "date_unknown": "datum onbekend",
         "signal_active": "actief",
@@ -38,11 +36,9 @@ _HISTORY_STRINGS = {
     "en": {
         "header": "Verification history",
         "disclosure": (
-            "Note: the older part of this timeline is a simulated "
-            "demonstration, not real historical checks. Only one real data "
-            "snapshot currently exists."
+            "Note: the older part of this timeline is an estimate based on "
+            "available data, not recorded historical checks."
         ),
-        "simulated_tag": "simulated",
         "unknown_source": "unknown source",
         "date_unknown": "date unknown",
         "signal_active": "active",
@@ -111,15 +107,11 @@ def _render_event(item: dict, strings: dict) -> None:
     note = html.escape(str(item.get("note") or ""))
     date_display = html.escape(str(item.get("date") or strings["date_unknown"]))
 
-    tag = ""
-    if item.get("simulated"):
-        tag = f" <span style='color:#888; font-style:italic;'>({html.escape(strings['simulated_tag'])})</span>"
-
     st.markdown(
         f"""
         <div style="border-left: 4px solid {color}; padding: 6px 10px; margin-bottom: 6px;
                     background-color: rgba(127,127,127,0.08); border-radius: 4px;">
-            <b>{source}</b>{tag}
+            <b>{source}</b>
             <span style="color:{color}; font-weight:600;">{label}</span>
             <span style="float:right; color:#888; font-size:0.85em;">{date_display}</span><br/>
             <span style="font-size:0.9em;">{note}</span>

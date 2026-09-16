@@ -230,8 +230,8 @@ def main() -> None:
 
     st.title("Bedrijvenportaal: controleer en werk uw gegevens bij")
     st.info(
-        "Dit is een demoportaal. In een echte versie zou u hier inloggen met uw "
-        "ondernemingsnummer of eID."
+        "In deze versie van het portaal wordt niet ingelogd. In een volledige versie "
+        "zou u hier inloggen met uw ondernemingsnummer of eID."
     )
     st.write(
         "Zoek hieronder uw bedrijf op en bevestig of uw gegevens nog kloppen. Uw melding "
