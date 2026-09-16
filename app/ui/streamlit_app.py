@@ -219,6 +219,20 @@ TRANSLATIONS = {
         "dossier_open_related_dossier_button": "Open dossier van dit bedrijf",
         "dossier_sources_overview_header": "Bronnen in één oogopslag",
         "source_not_yet_checked": "Nog niet gecontroleerd",
+        "evidence_signal_active": "Actief",
+        "evidence_signal_inactive": "Inactief",
+        "evidence_signal_disagreement": "Wijkt af",
+        "evidence_signal_silent": "Geen reactie",
+        "dossier_priority_panel_header": "Prioriteitsscore",
+        "dossier_stat_trust_label": "Betrouwbaarheid",
+        "dossier_stat_freshness_label": "Actualiteit",
+        "dossier_stat_priority_label": "Prioriteit",
+        "dossier_contact_attempts_header": "Contactpogingen",
+        "dossier_next_step_header": "Volgende stap",
+        "dossier_next_step_text": (
+            "De AI-telefoonagent belt het geregistreerde nummer, vraagt alleen naar publieke "
+            "bedrijfsgegevens en registreert het resultaat in dit dossier."
+        ),
         "dossier_technical_details_header": "Technische details",
         "col_reliability": "Betrouwbaarheid",
         "dossier_metric_uncertainty": "Onzekerheid",
@@ -376,6 +390,20 @@ TRANSLATIONS = {
         "dossier_open_related_dossier_button": "Open this business's dossier",
         "dossier_sources_overview_header": "Sources at a glance",
         "source_not_yet_checked": "Not yet checked",
+        "evidence_signal_active": "Active",
+        "evidence_signal_inactive": "Inactive",
+        "evidence_signal_disagreement": "Conflicting",
+        "evidence_signal_silent": "No response",
+        "dossier_priority_panel_header": "Priority score",
+        "dossier_stat_trust_label": "Trust",
+        "dossier_stat_freshness_label": "Freshness",
+        "dossier_stat_priority_label": "Priority",
+        "dossier_contact_attempts_header": "Contact attempts",
+        "dossier_next_step_header": "Next step",
+        "dossier_next_step_text": (
+            "The AI phone agent calls the registered number, asks only about public company "
+            "information, and records the outcome in this business's record."
+        ),
         "dossier_technical_details_header": "Technical details",
         "col_reliability": "Reliability",
         "dossier_metric_uncertainty": "Uncertainty",
@@ -1349,20 +1377,33 @@ def _worklist_priority_terciles(db_path: str):
     return compute_priority_terciles(scored)
 
 
+def _badge_row_html(items: list) -> str:
+    """Return (does not render) the HTML for a row of dot+label ".stg" tags.
+
+    ``items`` is a list of ``(label, hex_color)`` tuples. Split out from
+    ``render_badge_row`` so ``render_sources_overview`` can embed a single
+    tag inline inside its own per-source row HTML, without a second
+    ``st.markdown`` call breaking up that row's single HTML block.
+    """
+    return "".join(
+        '<span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;'
+        'white-space:nowrap;margin:2px 14px 2px 0;">'
+        f'<span style="width:8px;height:8px;flex:none;display:inline-block;'
+        f'background-color:{color};"></span>'
+        f'{html.escape(str(label))}</span>'
+        for label, color in items
+    )
+
+
 def render_badge_row(items: list) -> None:
-    """Render a compact row of color-coded pill badges.
+    """Render a compact row of dot+label status indicators.
 
     ``items`` is a list of ``(label, hex_color)`` tuples. Pure presentation;
     used by the dossier's reliability badges and the worklist's per-row
-    trust indicator.
+    trust indicator. Renders the mockup's ".stg" dot+label pattern (a small
+    square swatch before the label), not a pill.
     """
-    chips = "".join(
-        f'<span style="display:inline-block; padding:4px 12px; margin:2px 8px 2px 0; '
-        f'border-radius:12px; background-color:{color}; color:#ffffff; font-weight:600; '
-        f'font-size:0.85em;">{html.escape(str(label))}</span>'
-        for label, color in items
-    )
-    st.markdown(chips, unsafe_allow_html=True)
+    st.markdown(_badge_row_html(items), unsafe_allow_html=True)
 
 
 def _status_badge(status, lang: str):
@@ -1446,7 +1487,7 @@ def render_reliability_badges(reliability: dict, score, terciles, lang: str) -> 
 
 
 def render_address_conflict_callout(note: str, related_uidn, lang: str) -> None:
-    """A distinct, amber-bordered callout for an address conflict.
+    """A distinct, accent-bordered callout for an address conflict.
 
     ``related_uidn`` (may be ``None``) is the uidn of the other business
     registered at the same address, per ``address_crosscheck.check()``'s
@@ -1454,15 +1495,15 @@ def render_address_conflict_callout(note: str, related_uidn, lang: str) -> None:
     to that business's own dossier via the established pending_nav
     mechanism.
     """
-    color = MAP_COLOR_MEDIUM
     st.markdown(
         f"""
-        <div style="border: 2px solid {color}; padding: 10px 14px; margin: 10px 0;
-                    background-color: rgba(239,108,0,0.10); border-radius: 6px;">
-            <span style="color:{color}; font-weight:700;">
+        <div style="border-left: 3px solid {theme.COLOR_ACCENT}; border-top: 1px solid {theme.COLOR_NEUTRAL_300};
+                    border-right: 1px solid {theme.COLOR_NEUTRAL_300}; border-bottom: 1px solid {theme.COLOR_NEUTRAL_300};
+                    padding: 10px 14px; margin: 10px 0; background-color: {theme.COLOR_ACCENT_100};">
+            <span style="color:{theme.COLOR_ACCENT_DARK}; font-weight:700; font-size:13px;">
                 &#9888; {html.escape(t("dossier_address_conflict_label", lang))}
             </span><br/>
-            <span style="font-size:0.95em;">{html.escape(str(note))}</span>
+            <span style="font-size:0.95em; color:{theme.COLOR_NEUTRAL_800};">{html.escape(str(note))}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1480,41 +1521,101 @@ def render_address_conflict_callout(note: str, related_uidn, lang: str) -> None:
             st.rerun()
 
 
+_SIGNAL_LABEL_KEYS = {
+    "active": "evidence_signal_active",
+    "inactive": "evidence_signal_inactive",
+    "disagreement": "evidence_signal_disagreement",
+    "silent": "evidence_signal_silent",
+}
+
+
 def render_sources_overview(evidence_rows: list, lang: str) -> None:
-    """One compact card per evidence source, showing its most recent signal.
+    """The dossier's "evidence from connected sources" panel: one ".row" per
+    source, headed by a ``theme.panel_header`` bar.
 
     ``evidence_rows`` is this business's evidence rows (see ``get_evidence``);
     grouped/indexed by ``source`` since every source keeps at most one row
     per business. Sources with no evidence row yet show a neutral "not yet
-    checked" grey state.
+    checked" state and no signal tag. Renders as a single HTML blob (header
+    + all source rows) so it stacks with no gaps -- the caller (view_dossier)
+    is expected to render this inside a bordered container and append the
+    case-summary paragraph directly below it, inside that same container.
     """
     by_source = {row.get("source"): row for row in (evidence_rows or []) if row.get("source")}
 
-    cols = st.columns(3)
-    for i, source_key in enumerate(SOURCE_DISPLAY_ORDER):
+    rows_html = ""
+    for source_key in SOURCE_DISPLAY_ORDER:
         names = SOURCE_DISPLAY_NAMES.get(source_key, {})
         name = names.get(lang, names.get("nl", source_key))
         row = by_source.get(source_key)
         if row:
             signal = row.get("signal") or "silent"
             color = SIGNAL_BADGE_COLORS.get(signal, MAP_COLOR_UNCHECKED)
-            summary = row.get("detail") or t("source_not_yet_checked", lang)
-        else:
-            color = MAP_COLOR_UNCHECKED
-            summary = t("source_not_yet_checked", lang)
-
-        with cols[i % 3]:
-            st.markdown(
-                f"""
-                <div style="border-left: 4px solid {color}; padding: 6px 10px; margin-bottom: 8px;
-                            background-color: rgba(127,127,127,0.08); border-radius: 4px;
-                            min-height: 88px;">
-                    <b>{html.escape(name)}</b><br/>
-                    <span style="font-size:0.85em;">{html.escape(str(summary))}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            signal_label = t(_SIGNAL_LABEL_KEYS.get(signal, "evidence_signal_silent"), lang)
+            tag_html = _badge_row_html([(signal_label, color)])
+            timestamp_html = (
+                f'<span style="margin-left:auto;font-size:11px;color:{theme.COLOR_NEUTRAL_700};">'
+                f'{html.escape(format_date(row.get("created_at"), lang))}</span>'
             )
+            detail = row.get("detail") or t("source_not_yet_checked", lang)
+        else:
+            tag_html = ""
+            timestamp_html = ""
+            detail = t("source_not_yet_checked", lang)
+
+        rows_html += (
+            f'<div style="padding:12px 14px;border-bottom:1px solid {theme.COLOR_NEUTRAL_200};">'
+            '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">'
+            f'<span style="font-weight:600;font-size:13.5px;">{html.escape(name)}</span>'
+            f"{tag_html}{timestamp_html}"
+            "</div>"
+            f'<div style="font-size:13px;color:{theme.COLOR_NEUTRAL_800};line-height:1.5;margin-top:2px;">'
+            f"{html.escape(str(detail))}</div>"
+            "</div>"
+        )
+
+    st.markdown(
+        theme.panel_header(t("dossier_sources_overview_header", lang)) + rows_html,
+        unsafe_allow_html=True,
+    )
+
+
+# Outreach channels already run against a business, out of every evidence
+# source -- the subset shown in the dossier aside's "contact attempts" panel.
+CONTACT_ATTEMPT_SOURCES = ("voice_agent", "email", "internal_mailbox")
+
+
+def _contact_attempts_kv_html(evidence_rows: list, lang: str) -> str:
+    """KV rows (mockup's ".kv" pattern) for the aside's "contact attempts"
+    panel: the outreach channels already run against this business, reusing
+    the same evidence rows ``render_sources_overview`` shows, filtered down
+    to the contact channels (``CONTACT_ATTEMPT_SOURCES``). No new fields --
+    just ``source``/``detail``/``created_at`` off the existing evidence rows.
+    """
+    by_source = {row.get("source"): row for row in (evidence_rows or []) if row.get("source")}
+    last_index = len(CONTACT_ATTEMPT_SOURCES) - 1
+
+    rows_html = ""
+    for i, source_key in enumerate(CONTACT_ATTEMPT_SOURCES):
+        names = SOURCE_DISPLAY_NAMES.get(source_key, {})
+        name = names.get(lang, names.get("nl", source_key))
+        row = by_source.get(source_key)
+        if row:
+            date_label = format_date(row.get("created_at"), lang)
+            detail = str(row.get("detail") or t("source_not_yet_checked", lang))
+            value = f"{detail} ({date_label})" if date_label != t("unknown", lang) else detail
+        else:
+            value = t("source_not_yet_checked", lang)
+
+        border = "border-bottom:0;" if i == last_index else f"border-bottom:1px solid {theme.COLOR_NEUTRAL_200};"
+        rows_html += (
+            f'<div style="display:flex;justify-content:space-between;gap:14px;padding:8px 14px;'
+            f'{border}font-size:13px;">'
+            f'<span style="color:{theme.COLOR_NEUTRAL_700};">{html.escape(name)}</span>'
+            f'<span style="text-align:right;">{html.escape(value)}</span>'
+            "</div>"
+        )
+    return rows_html
 
 
 # --------------------------------------------------------------------------
@@ -1613,26 +1714,14 @@ def view_dossier(db_path: str, lang: str) -> None:
         }
         st.rerun()
 
-    if st.button(t("dossier_call_simulation_button", lang)):
-        call_animation.open_call_dialog(business, db_path, lang)
-
     evidence_rows = get_evidence(uidn, db_path)
     score = get_score(uidn, db_path)
     dampener = seasonal.seasonal_dampener(business, evidence_rows, date.today().month)
     reliability = scoring.compute_reliability_report(uidn, db_path)
-
-    st.divider()
-    st.subheader(t("dossier_case_file_header", lang))
-    st.write(generate_case_file_text(business, evidence_rows, dampener, lang))
-    if dampener and dampener.get("dampener_factor", 1.0) < 1.0 and dampener.get("reason"):
-        # app.seasonal's `reason` field is English (module is frozen, not ours
-        # to change) -- shown only as clearly-labeled internal/debug detail,
-        # never as officer-facing Dutch text.
-        st.caption(t("dossier_internal_debug_caption", lang, reason=dampener["reason"]))
+    terciles = _worklist_priority_terciles(db_path)
 
     st.divider()
     st.subheader(t("dossier_reliability_header", lang))
-    terciles = _worklist_priority_terciles(db_path)
     render_reliability_badges(reliability, score, terciles, lang)
     reason = reliability.get("reason") or ""
     if reason:
@@ -1649,8 +1738,83 @@ def view_dossier(db_path: str, lang: str) -> None:
         render_address_conflict_callout(note_text, conflict.get("related_uidn"), lang)
 
     st.divider()
-    st.subheader(t("dossier_sources_overview_header", lang))
-    render_sources_overview(evidence_rows, lang)
+    # Two-column case-file body, matching the mockup's dossier layout: a
+    # wider main column (evidence rows + case summary) and a narrower aside
+    # stacking the priority/contact/next-step panels.
+    col_main, col_aside = st.columns([1.5, 1])
+
+    with col_main:
+        with st.container(border=True):
+            render_sources_overview(evidence_rows, lang)
+            case_summary = generate_case_file_text(business, evidence_rows, dampener, lang)
+            st.markdown(
+                f'<p style="margin:0;padding:14px;background-color:{theme.COLOR_NEUTRAL_100};'
+                f'font-size:13px;line-height:1.6;color:{theme.COLOR_NEUTRAL_800};">'
+                f"{html.escape(case_summary)}</p>",
+                unsafe_allow_html=True,
+            )
+        if dampener and dampener.get("dampener_factor", 1.0) < 1.0 and dampener.get("reason"):
+            # app.seasonal's `reason` field is English (module is frozen, not
+            # ours to change) -- shown only as clearly-labeled internal/debug
+            # detail, never as officer-facing Dutch text.
+            st.caption(t("dossier_internal_debug_caption", lang, reason=dampener["reason"]))
+
+    with col_aside:
+        # Priority panel: the existing word-badge priority label is the
+        # dominant stat here, never a raw number -- see the module-level
+        # note above render_reliability_badges. The full numeric
+        # uncertainty/impact/priority scores stay confined to the collapsed
+        # "Technical details" expander below.
+        with st.container(border=True):
+            priority_score = score.get("priority_score") if score else None
+            priority_label, _priority_color = _priority_badge(priority_score, terciles, lang)
+            trust_label, _trust_color = _trust_badge(reliability.get("trust"), lang)
+            freshness_label, _freshness_color = _freshness_badge(reliability.get("freshness"), lang)
+            stats_html = theme.stat_row_html(
+                [
+                    theme.stat_block_html(t("dossier_stat_trust_label", lang), trust_label),
+                    theme.stat_block_html(t("dossier_stat_freshness_label", lang), freshness_label),
+                    theme.stat_block_html(
+                        t("dossier_stat_priority_label", lang), priority_label, accent=True
+                    ),
+                ]
+            )
+            st.markdown(
+                theme.panel_header(t("dossier_priority_panel_header", lang)) + stats_html,
+                unsafe_allow_html=True,
+            )
+            if score and score.get("updated_at"):
+                st.caption(
+                    t(
+                        "dossier_last_calculated_caption",
+                        lang,
+                        date=format_date(score.get("updated_at"), lang),
+                    )
+                )
+
+        with st.container(border=True):
+            st.markdown(
+                theme.panel_header(t("dossier_contact_attempts_header", lang))
+                + _contact_attempts_kv_html(evidence_rows, lang),
+                unsafe_allow_html=True,
+            )
+
+        with st.container(border=True):
+            st.markdown(
+                theme.panel_header(t("dossier_next_step_header", lang)), unsafe_allow_html=True
+            )
+            st.markdown(
+                f'<p style="margin:0;padding:12px 14px 6px;font-size:13px;'
+                f'color:{theme.COLOR_NEUTRAL_800};">'
+                f'{html.escape(t("dossier_next_step_text", lang))}</p>',
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                t("dossier_call_simulation_button", lang),
+                use_container_width=True,
+                key=f"call_business_{uidn}",
+            ):
+                call_animation.open_call_dialog(business, db_path, lang)
 
     with st.expander(t("dossier_technical_details_header", lang)):
         if score:
