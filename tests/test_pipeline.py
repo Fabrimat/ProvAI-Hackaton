@@ -37,7 +37,12 @@ from app.ingest import (  # noqa: E402
 from app.scoring import compute_score, run_all_sources  # noqa: E402
 from app.seasonal import seasonal_dampener  # noqa: E402
 
-VALID_SIGNALS = {"active", "inactive", "silent", "disagreement"}
+# `None` is included because app.sources.address_crosscheck.check() -- one
+# of the sources run_all_sources now includes -- deliberately returns
+# signal=None (with a non-empty detail) for the large majority of
+# businesses that have no conflicting registration at their address; see
+# that module's docstring.
+VALID_SIGNALS = {"active", "inactive", "silent", "disagreement", None}
 
 REAL_DB_PATH = REPO_ROOT / "data" / "provai.db"
 
@@ -129,7 +134,7 @@ class PipelineSmokeTest(unittest.TestCase):
         self.assertEqual(len(businesses), 3)
         for business in businesses:
             results = run_all_sources(business, db_path=self.db_path)
-            self.assertEqual(len(results), 6)
+            self.assertEqual(len(results), 9)
             for result in results:
                 self.assertIn("signal", result)
                 self.assertIn("detail", result)
@@ -188,7 +193,7 @@ class PipelineSmokeTest(unittest.TestCase):
         self.assertIsNone(business["email"])
 
         results = run_all_sources(business, db_path=self.db_path)
-        self.assertEqual(len(results), 6)
+        self.assertEqual(len(results), 9)
 
         score = compute_score(uidn, db_path=self.db_path)
         self.assertGreaterEqual(score["priority_score"], 0)

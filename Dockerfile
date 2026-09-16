@@ -34,4 +34,4 @@ EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
 
-CMD ["sh", "-c", "test -f /app/data/provai.db || python -m app.ingest; streamlit run app/ui/streamlit_app.py --server.port=8501 --server.address=0.0.0.0"]
+CMD ["sh", "-c", "test -f /app/data/provai.db || python -m app.ingest; python -c \"from app.db import init_db; from app.description import backfill_missing_descriptions; from app.scoring import dedupe_evidence; init_db(); backfill_missing_descriptions(); dedupe_evidence()\"; streamlit run app/ui/streamlit_app.py --server.port=8501 --server.address=0.0.0.0"]

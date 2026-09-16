@@ -52,6 +52,53 @@ def _business_address(business: dict) -> str:
     return ", ".join(parts)
 
 
+def _mock_signals(uidn) -> dict:
+    """Derive every mock Google Maps signal for one business in ONE draw sequence.
+
+    Both ``_fabricate_place_details`` (used by ``check()``) and
+    ``get_review_recency_days`` read from this single shared derivation,
+    seeded on ``uidn`` alone, so a business's status/rating/review-count
+    and its review recency can never contradict each other (e.g. an
+    "operational" mock business can never also report zero reviews in
+    3 years).
+
+    ``days_since_last_review`` is biased toward recent (roughly 0-60
+    days) for operational businesses, and toward old (roughly 400-900+
+    days) or ``None`` (no reviews at all) for closed/not-found ones.
+    """
+    rng = random.Random(uidn)
+    roll = rng.random()
+
+    if roll < ACTIVE_CUTOFF:
+        return {
+            "status": "OPERATIONAL",
+            "rating": round(rng.uniform(3.2, 4.9), 1),
+            "review_count": rng.randint(2, 180),
+            "days_since_last_review": rng.randint(0, 60),
+        }
+    if roll < INACTIVE_CUTOFF:
+        has_reviews = rng.random() < 0.6
+        if has_reviews:
+            return {
+                "status": "CLOSED_PERMANENTLY",
+                "rating": round(rng.uniform(2.5, 4.5), 1),
+                "review_count": rng.randint(1, 60),
+                "days_since_last_review": rng.randint(400, 900),
+            }
+        return {
+            "status": "CLOSED_PERMANENTLY",
+            "rating": None,
+            "review_count": None,
+            "days_since_last_review": None,
+        }
+    return {
+        "status": None,
+        "rating": None,
+        "review_count": None,
+        "days_since_last_review": None,
+    }
+
+
 def _fabricate_place_details(business: dict):
     """Fabricate a dict shaped like a real Places "Place Details" result.
 
@@ -61,27 +108,35 @@ def _fabricate_place_details(business: dict):
     """
     uidn = business.get("uidn")
     name = _business_name(business)
-    rng = random.Random(uidn)
-    roll = rng.random()
+    signals = _mock_signals(uidn)
 
-    if roll < ACTIVE_CUTOFF:
-        return {
-            "name": name,
-            "business_status": "OPERATIONAL",
-            "rating": round(rng.uniform(3.2, 4.9), 1),
-            "user_ratings_total": rng.randint(2, 180),
-            "formatted_address": _business_address(business),
-        }
-    if roll < INACTIVE_CUTOFF:
-        has_reviews = rng.random() < 0.6
-        return {
-            "name": name,
-            "business_status": "CLOSED_PERMANENTLY",
-            "rating": round(rng.uniform(2.5, 4.5), 1) if has_reviews else None,
-            "user_ratings_total": rng.randint(1, 60) if has_reviews else None,
-            "formatted_address": _business_address(business),
-        }
-    return None  # no candidates -- not listed on Google Maps at all
+    if signals["status"] is None:
+        return None  # no candidates -- not listed on Google Maps at all
+
+    return {
+        "name": name,
+        "business_status": signals["status"],
+        "rating": signals["rating"],
+        "user_ratings_total": signals["review_count"],
+        "formatted_address": _business_address(business),
+    }
+
+
+def get_review_recency_days(business: dict):
+    """Return days since the most recent Google Maps review, or ``None``.
+
+    ``None`` means either "no reviews at all" (mock) or "unknown" (real
+    API mode -- the Place Details fields this module fetches do not
+    include review timestamps, so a real business's recency is never
+    fabricated). Reads from the same shared derivation as
+    ``_fabricate_place_details`` (see ``_mock_signals``), so this can
+    never contradict that business's own ``check()`` signal.
+    """
+    business = business or {}
+    if os.environ.get("GOOGLE_MAPS_API_KEY"):
+        return None
+    uidn = business.get("uidn")
+    return _mock_signals(uidn)["days_since_last_review"]
 
 
 def _signal_from_place_details(place, name: str):
@@ -158,8 +213,18 @@ def _fetch_real_place_details(business: dict, api_key: str):
 
 
 def _log_evidence(business_uidn, signal, detail, db_path=None) -> None:
+    """Replace any existing evidence row for (business_uidn, SOURCE_NAME).
+
+    Re-running verification must not accumulate an ever-growing history
+    of rows for the same source -- at most one row per (business,
+    source) pair exists at any time, representing the latest reading.
+    """
     conn = get_connection(db_path) if db_path else get_connection()
     try:
+        conn.execute(
+            "DELETE FROM evidence WHERE business_uidn = ? AND source = ?",
+            (business_uidn, SOURCE_NAME),
+        )
         conn.execute(
             "INSERT INTO evidence (business_uidn, source, signal, detail, created_at) "
             "VALUES (?, ?, ?, ?, ?)",

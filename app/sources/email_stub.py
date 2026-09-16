@@ -42,8 +42,18 @@ def _pick_outcome(rng: random.Random) -> str:
 
 
 def _log_evidence(business_uidn, signal, detail, db_path=None) -> None:
+    """Replace any existing evidence row for (business_uidn, SOURCE_NAME).
+
+    Re-running verification must not accumulate an ever-growing history
+    of rows for the same source -- at most one row per (business,
+    source) pair exists at any time, representing the latest reading.
+    """
     conn = get_connection(db_path) if db_path else get_connection()
     try:
+        conn.execute(
+            "DELETE FROM evidence WHERE business_uidn = ? AND source = ?",
+            (business_uidn, SOURCE_NAME),
+        )
         conn.execute(
             "INSERT INTO evidence (business_uidn, source, signal, detail, created_at) "
             "VALUES (?, ?, ?, ?, ?)",

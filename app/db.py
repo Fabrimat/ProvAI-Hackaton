@@ -122,12 +122,33 @@ SCHEMA_STATEMENTS = [
 ]
 
 
+def _ensure_description_column(conn: sqlite3.Connection) -> None:
+    """Idempotent migration: add ``businesses.description`` if missing.
+
+    Safe to call on every startup, including against an already-populated,
+    already-deployed database: checks ``PRAGMA table_info(businesses)``
+    first and only runs ``ALTER TABLE`` when the column is genuinely
+    absent.
+    """
+    columns = conn.execute("PRAGMA table_info(businesses)").fetchall()
+    column_names = {row["name"] for row in columns}
+    if "description" not in column_names:
+        conn.execute("ALTER TABLE businesses ADD COLUMN description TEXT")
+
+
 def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
-    """Create all tables (if missing) in the database at ``db_path``."""
+    """Create all tables (if missing) in the database at ``db_path``.
+
+    Also runs idempotent schema migrations (currently: adding
+    ``businesses.description`` if it doesn't already exist) so this is
+    safe to call on every app startup, including against an already
+    populated, already deployed database.
+    """
     conn = get_connection(db_path)
     try:
         for statement in SCHEMA_STATEMENTS:
             conn.execute(statement)
+        _ensure_description_column(conn)
         conn.commit()
     finally:
         conn.close()
