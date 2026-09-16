@@ -29,6 +29,20 @@ DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
 st.set_page_config(page_title="Volledige gegevenslijst", layout="wide")
 
+# Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav) so
+# only the main app's custom sidebar navigation is visible -- otherwise both
+# are stacked in the sidebar at once. Selector targets stSidebarNav as of
+# streamlit 1.38; re-check if streamlit is upgraded.
+st.markdown(
+    "<style>[data-testid='stSidebarNav'] {display: none;}</style>",
+    unsafe_allow_html=True,
+)
+
+# Back-link to the main entrypoint script, since this page's own automatic
+# nav entry is hidden above -- without this there would be no visible way
+# back to the main dashboard on camera.
+st.sidebar.page_link("streamlit_app.py", label="Terug naar hoofdscherm")
+
 ENTITY_TYPE_LABELS_NL = {
     "enterprise": "Onderneming",
     "establishment": "Vestiging",

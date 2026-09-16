@@ -209,7 +209,24 @@ def render_lookup_and_form(businesses: list) -> None:
 
 
 def main() -> None:
+    # Deliberately kept "centered" (unlike the officer-facing app and page 1,
+    # both "wide"): this is a citizen self-service portal and should feel
+    # like a simple form, not a dense officer dashboard.
     st.set_page_config(page_title="Bedrijvenportaal", layout="centered")
+
+    # Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav)
+    # so only the main app's custom sidebar navigation is visible -- otherwise
+    # both are stacked in the sidebar at once. Selector targets stSidebarNav
+    # as of streamlit 1.38; re-check if streamlit is upgraded.
+    st.markdown(
+        "<style>[data-testid='stSidebarNav'] {display: none;}</style>",
+        unsafe_allow_html=True,
+    )
+
+    # Back-link to the main entrypoint script, since this page's own
+    # automatic nav entry is hidden above -- without this there would be no
+    # visible way back to the main dashboard on camera.
+    st.sidebar.page_link("streamlit_app.py", label="Terug naar hoofdscherm")
 
     st.title("Bedrijvenportaal: controleer en werk uw gegevens bij")
     st.info(

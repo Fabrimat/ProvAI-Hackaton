@@ -42,8 +42,7 @@ if str(REPO_ROOT) not in sys.path:
 from app import scoring, seasonal  # noqa: E402
 from app.db import get_connection  # noqa: E402
 from app.ingest import get_business, list_businesses  # noqa: E402
-from app.ui import freshness_view  # noqa: E402
-from app.ui.call_animation import render_call_simulation  # noqa: E402
+from app.ui import call_animation, freshness_view  # noqa: E402
 from app.ui.history_view import render_history  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
@@ -94,6 +93,9 @@ TRANSLATIONS = {
         "nav_dossier": "Dossier",
         "nav_discovery": "Ontdekkingslijst",
         "nav_freshness": "Wat is er veranderd?",
+        "nav_more_label": "Meer",
+        "nav_full_list_link": "Volledige gegevenslijst",
+        "nav_business_portal_link": "Bedrijvenportaal",
         "status_pending": "Nog te controleren",
         "status_confirmed_active": "Bevestigd: actief",
         "status_confirmed_inactive": "Bevestigd: inactief",
@@ -233,6 +235,9 @@ TRANSLATIONS = {
         "nav_dossier": "Case file",
         "nav_discovery": "Discovery queue",
         "nav_freshness": "What's changed?",
+        "nav_more_label": "More",
+        "nav_full_list_link": "Full data list",
+        "nav_business_portal_link": "Business portal",
         "status_pending": "Not yet checked",
         "status_confirmed_active": "Confirmed: active",
         "status_confirmed_inactive": "Confirmed: inactive",
@@ -790,8 +795,128 @@ def render_demo_scenario_control(db_path: str, lang: str) -> None:
                 progress = st.progress(0.0)
                 processed = run_demo_scenario(db_path, progress.progress)
         st.cache_data.clear()
-        st.sidebar.success(t("demo_success", lang, n=processed))
+        # Flash pattern, see render_flash(): a success message right before
+        # st.rerun() would only be visible for a fraction of a second (if at
+        # all) before the redraw wipes it, so it is stashed and rendered on
+        # the next run instead.
+        st.session_state["flash"] = {
+            "kind": "success",
+            "text": t("demo_success", lang, n=processed),
+        }
         st.rerun()
+
+
+# --------------------------------------------------------------------------
+# Flash messages: a single session_state slot for a success/info message that
+# must survive an immediately-following st.rerun(). Without this, a message
+# rendered right before st.rerun() is drawn for a fraction of a second (if at
+# all) and then wiped by the redraw -- on video this looks like the button
+# click did nothing. Every st.success(...) + st.rerun() pair in this file
+# goes through this instead.
+# --------------------------------------------------------------------------
+
+def render_flash() -> None:
+    """Render and consume the pending flash message, if any.
+
+    Called once near the top of main(), before any view is dispatched, so
+    the message appears above whichever view is currently shown.
+    """
+    flash = st.session_state.get("flash")
+    if not flash:
+        return
+    text = flash.get("text", "")
+    if flash.get("kind") == "info":
+        st.info(text)
+    else:
+        st.success(text)
+    st.session_state["flash"] = None
+
+
+# --------------------------------------------------------------------------
+# Demo walkthrough: a scripted sequence of navigation-only stops for the
+# video recording. Steps only change nav/selected_uidn session_state (the
+# same pending_nav mechanism used elsewhere in this file); they never trigger
+# an in-view action themselves, so the presenter still visibly clicks the
+# real buttons on camera. Assumes CURATED_DEMO_UIDNS was already seeded via
+# the "Laad demo-scenario" button before recording started.
+# --------------------------------------------------------------------------
+
+DEMO_WALKTHROUGH_STEPS = [
+    {
+        "nav": "Dashboard",
+        "caption_nl": "het automatische monitoringdashboard.",
+        "caption_en": "the automatic monitoring dashboard.",
+    },
+    {
+        "nav": "Te verifiëren",
+        "caption_nl": "de actielijst van de ambtenaar.",
+        "caption_en": "the officer's action queue.",
+    },
+    {
+        "nav": "Dossier",
+        "uidn": CURATED_DEMO_UIDNS[0],
+        "caption_nl": "één gemarkeerd dossier openen.",
+        "caption_en": "opening one flagged case.",
+    },
+    {
+        "nav": "Dossier",
+        "uidn": CURATED_DEMO_UIDNS[0],
+        "caption_nl": "klik op 'Simuleer telefoongesprek' om de AI-spraakcontrole te tonen.",
+        "caption_en": "click 'Simulate phone call' to show the AI voice check.",
+    },
+    {
+        "nav": "Dossier",
+        "uidn": CURATED_DEMO_UIDNS[0],
+        "caption_nl": "bevestig de uitkomst met een van de knoppen hieronder.",
+        "caption_en": "confirm the outcome with one of the buttons below.",
+    },
+    {
+        "nav": "Wat is er veranderd?",
+        "caption_nl": "wat er veranderd is sinds de laatste controle.",
+        "caption_en": "what changed since the last check.",
+    },
+]
+
+
+def render_demo_walkthrough_control(lang: str) -> None:
+    """Sidebar expander stepping a presenter through DEMO_WALKTHROUGH_STEPS.
+
+    Deliberately excludes Ontdekkingslijst and the batch-verification
+    control (both make live network calls, better left to manual, off-script
+    demonstration) and never calls run_demo_scenario() itself (that must be
+    run before recording starts, see render_demo_scenario_control above).
+    """
+    total = len(DEMO_WALKTHROUGH_STEPS)
+    expander_title = "Demo doorloop" if lang == "nl" else "Demo walkthrough"
+    with st.sidebar.expander(expander_title):
+        step = st.session_state.get("demo_step", 0)
+        if step > 0:
+            current = DEMO_WALKTHROUGH_STEPS[step - 1]
+            if lang == "nl":
+                st.caption(f"Demo stap {step} van {total}: {current['caption_nl']}")
+            else:
+                st.caption(f"Demo step {step} of {total}: {current['caption_en']}")
+        else:
+            st.caption(
+                "Nog niet gestart." if lang == "nl" else "Not started yet."
+            )
+
+        col_next, col_reset = st.columns(2)
+        with col_next:
+            next_label = "Volgende stap" if lang == "nl" else "Next step"
+            if st.button(next_label, key="demo_walkthrough_next"):
+                next_step = step + 1 if step < total else 1
+                target = DEMO_WALKTHROUGH_STEPS[next_step - 1]
+                st.session_state["pending_nav"] = target["nav"]
+                if "uidn" in target:
+                    st.session_state["selected_uidn"] = target["uidn"]
+                st.session_state["demo_step"] = next_step
+                st.rerun()
+        with col_reset:
+            # "Reset" reads the same in both languages, no translation needed.
+            if st.button("Reset", key="demo_walkthrough_reset"):
+                st.session_state["demo_step"] = 0
+                st.rerun()
 
 
 # --------------------------------------------------------------------------
@@ -966,8 +1091,41 @@ def view_to_verify(db_path: str, lang: str) -> None:
                 scoring.compute_score(uidn, db_path)
             progress.progress((i + 1) / len(candidate_uidns))
         st.cache_data.clear()
-        st.success(t("triage_verify_success", lang, n=len(candidate_uidns)))
+        st.session_state["flash"] = {
+            "kind": "success",
+            "text": t("triage_verify_success", lang, n=len(candidate_uidns)),
+        }
         st.rerun()
+
+
+def render_persisted_call_outcome(outcome: dict, lang: str) -> None:
+    """Redraw a persisted call-simulation result card after a rerun.
+
+    render_call_simulation's own result card is wiped by the st.rerun() that
+    follows it (see the call-simulation button handler in view_dossier), so
+    this redraws an equivalent card from the outcome stashed in
+    st.session_state["last_call_outcome"]. Reuses call_animation's own
+    color/label mapping and translation helper (module-private, but that is
+    Python convention, not enforcement -- kept as-is rather than duplicating
+    the color palette and labels here) so the persisted card matches the
+    live animation exactly.
+    """
+    signal = outcome.get("signal") or "silent"
+    detail = html.escape(str(outcome.get("detail") or ""))
+    color = call_animation._RESULT_COLORS.get(signal, "#757575")
+    label_key = call_animation._RESULT_LABEL_KEYS.get(signal, "result_silent")
+    result_label = call_animation._s(label_key, lang)
+    detail_label = call_animation._s("detail_label", lang)
+    st.markdown(
+        f"""
+        <div style="border-left: 4px solid {color}; padding: 8px 12px; margin-bottom: 6px;
+                    background-color: rgba(127,127,127,0.08); border-radius: 4px;">
+            <span style="color:{color}; font-weight:700;">{result_label}</span><br/>
+            <span style="font-size:0.9em;">{detail_label}: {detail}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -1057,15 +1215,33 @@ def view_dossier(db_path: str, lang: str) -> None:
             scoring.run_all_sources(business, db_path)
             scoring.compute_score(uidn, db_path)
         st.cache_data.clear()
-        st.success(t("dossier_verification_success", lang))
+        st.session_state["flash"] = {
+            "kind": "success",
+            "text": t("dossier_verification_success", lang),
+        }
         st.rerun()
 
     if st.button(t("dossier_call_simulation_button", lang)):
-        render_call_simulation(business, db_path, lang)
+        outcome = call_animation.render_call_simulation(business, db_path, lang)
         scoring.compute_score(uidn, db_path)
         st.cache_data.clear()
-        st.success(t("dossier_call_simulation_success", lang))
+        # Stash the outcome (scoped to this uidn) so it can be redrawn after
+        # the rerun below wipes render_call_simulation's own result card --
+        # see render_persisted_call_outcome().
+        st.session_state["last_call_outcome"] = {
+            "uidn": uidn,
+            "signal": outcome.get("signal") or "silent",
+            "detail": outcome.get("detail") or "",
+        }
+        st.session_state["flash"] = {
+            "kind": "success",
+            "text": t("dossier_call_simulation_success", lang),
+        }
         st.rerun()
+
+    last_call_outcome = st.session_state.get("last_call_outcome")
+    if last_call_outcome and last_call_outcome.get("uidn") == uidn:
+        render_persisted_call_outcome(last_call_outcome, lang)
 
     evidence_rows = get_evidence(uidn, db_path)
     score = get_score(uidn, db_path)
@@ -1108,13 +1284,19 @@ def view_dossier(db_path: str, lang: str) -> None:
         if st.button(t("dossier_confirm_active_button", lang)):
             set_status(uidn, "confirmed_active", note or None, db_path)
             st.cache_data.clear()
-            st.success(t("dossier_status_updated", lang, status=labels["confirmed_active"]))
+            st.session_state["flash"] = {
+                "kind": "success",
+                "text": t("dossier_status_updated", lang, status=labels["confirmed_active"]),
+            }
             st.rerun()
     with col_b:
         if st.button(t("dossier_confirm_inactive_button", lang)):
             set_status(uidn, "confirmed_inactive", note or None, db_path)
             st.cache_data.clear()
-            st.success(t("dossier_status_updated", lang, status=labels["confirmed_inactive"]))
+            st.session_state["flash"] = {
+                "kind": "success",
+                "text": t("dossier_status_updated", lang, status=labels["confirmed_inactive"]),
+            }
             st.rerun()
 
 
@@ -1240,6 +1422,15 @@ def main() -> None:
     lang = st.session_state.get("lang", "nl")
     st.set_page_config(page_title=t("page_title", lang), layout="wide")
 
+    # Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav)
+    # so only this app's own custom sidebar navigation below is visible --
+    # otherwise both are stacked in the sidebar at once. Selector targets
+    # stSidebarNav as of streamlit 1.38; re-check if streamlit is upgraded.
+    st.markdown(
+        "<style>[data-testid='stSidebarNav'] {display: none;}</style>",
+        unsafe_allow_html=True,
+    )
+
     st.sidebar.title("PROV-AI")
 
     # Language toggle, prominently placed above the nav radio. Deliberately
@@ -1277,7 +1468,19 @@ def main() -> None:
         key="nav",
         format_func=lambda opt: t(NAV_LABEL_KEYS[opt], lang),
     )
+
+    # Secondary pages (auto-discovered by Streamlit, but their own automatic
+    # nav entry is hidden above): one deliberately-ordered "more" section
+    # below the main radio, instead of two separate nav panels.
+    st.sidebar.divider()
+    st.sidebar.caption(t("nav_more_label", lang))
+    st.sidebar.page_link("pages/1_Volledige_gegevenslijst.py", label=t("nav_full_list_link", lang))
+    st.sidebar.page_link("pages/2_Bedrijvenportaal.py", label=t("nav_business_portal_link", lang))
+
     render_demo_scenario_control(DB_PATH, lang)
+    render_demo_walkthrough_control(lang)
+
+    render_flash()
 
     if nav == "Dashboard":
         view_dashboard(DB_PATH, lang)
