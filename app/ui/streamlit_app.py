@@ -45,7 +45,7 @@ from app.ingest import get_business, list_businesses  # noqa: E402
 from app.sources import address_crosscheck  # noqa: E402
 from app.ui import call_animation, freshness_view, search_animation  # noqa: E402
 from app.ui.history_view import render_history  # noqa: E402
-from app.ui import ai_search_chat, data_sources_view  # noqa: E402
+from app.ui import ai_search_chat, data_sources_view, theme  # noqa: E402
 
 DB_PATH = str(REPO_ROOT / "data" / "provai.db")
 
@@ -1711,6 +1711,7 @@ def main() -> None:
     # so this defaults to Dutch, per the compliance requirement.
     lang = st.session_state.get("lang", "nl")
     st.set_page_config(page_title=t("page_title", lang), layout="wide")
+    theme.inject()
 
     # Hide Streamlit's own automatic sidebar page-list (testid stSidebarNav)
     # so only this app's own custom sidebar navigation below is visible --
